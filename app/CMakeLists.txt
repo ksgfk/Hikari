@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.8)
+
+add_subdirectory(00_hello_world)
+add_subdirectory(01_simple_triangle)
+add_subdirectory(02_skybox)
+add_subdirectory(03_blinn_phong)
+add_subdirectory(04_shadow_map)
+add_subdirectory(05_multi_light)

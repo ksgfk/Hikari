@@ -1,0 +1,5 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# 排除glad生成文件...
+ext/glad/* linguist-vendored

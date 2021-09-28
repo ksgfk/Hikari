@@ -1,0 +1,6 @@
+#ifndef HIKARI_DEFINE_INCLUDED
+#define HIKARI_DEFINE_INCLUDED
+
+#define PI 3.14159265359;
+
+#endif
