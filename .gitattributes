@@ -2,4 +2,6 @@
 * text=auto
 
 # 排除glad生成文件...
-ext/glad/* linguist-vendored
+ext/glad/include/KHR/khrplatform.h linguist-vendored
+ext/glad/include/glad/glad.h linguist-vendored
+ext/glad/src/glad.c linguist-vendored
