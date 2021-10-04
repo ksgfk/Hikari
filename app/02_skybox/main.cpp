@@ -161,7 +161,7 @@ class NormalPass : public RenderPass {
 
 int main(int argc, char** argv) {
   auto& app = Application::GetInstance();
-  app.SetAssetPath(argc, argv);
+  app.GetArgs(argc, argv);
   app.SetWindowCreateInfo({"Hikari Skybox"});
   app.SetRenderContextCreateInfo({3, 3});
   app.CreateCamera<PerspectiveCamera>();

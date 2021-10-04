@@ -213,7 +213,7 @@ class BlinnPhongPass : public RenderPass {
     blinnProg->UniformVec3("_lightColor", Vector3f(1, 1, 1).GetAddress());
     blinnProg->UniformVec3("_cameraPos", GetCamera()->GetPosition().GetAddress());
     blinnProg->UniformVec3("_specularColor", Vector3f(1, 1, 1).GetAddress());
-    blinnProg->Uniform("_shininess", 128.0f);
+    blinnProg->UniformFloat("_shininess", 128.0f);
     SetVertexBuffer(*(_wall->Vbo), GetVertexLayoutPositionPNT());
     SetVertexBuffer(*(_wall->Vbo), GetVertexLayoutNormalPNT());
     SetIndexBuffer(*(_wall->Ibo));
@@ -241,7 +241,7 @@ class BlinnPhongPass : public RenderPass {
 
 int main(int argc, char** argv) {
   auto& app = Application::GetInstance();
-  app.SetAssetPath(argc, argv);
+  app.GetArgs(argc, argv);
   app.SetWindowCreateInfo({"Hikari Shadow Map"});
   app.SetRenderContextCreateInfo({3, 3});
   app.CreateCamera<PerspectiveCamera>();

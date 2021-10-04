@@ -88,7 +88,7 @@ class BlinnPhongPass : public RenderPass {
     blinn->UniformVec3("_lightColor", Vector3f(1, 1, 1).GetAddress());
     blinn->UniformVec3("_cameraPos", GetCamera()->GetPosition().GetAddress());
     blinn->UniformVec3("_specularColor", Vector3f(1, 1, 1).GetAddress());
-    blinn->Uniform("_shininess", 32.0f);
+    blinn->UniformFloat("_shininess", 32.0f);
     SetVertexBuffer(*(_sphere->Vbo), GetVertexLayoutPositionPNT());
     SetVertexBuffer(*(_sphere->Vbo), GetVertexLayoutNormalPNT());
     SetIndexBuffer(*(_sphere->Ibo));

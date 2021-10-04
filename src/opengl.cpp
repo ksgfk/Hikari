@@ -28,6 +28,9 @@ void FeatureOpenGL::Init() {
   }
 
   HIKARI_CHECK_GL(glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &_minUboOffsetAlign));
+  HIKARI_CHECK_GL(glGetIntegerv(GL_MAX_UNIFORM_LOCATIONS, &_maxUniformLocation));
+  HIKARI_CHECK_GL(glGetIntegerv(GL_MAX_UNIFORM_BUFFER_BINDINGS, &_maxUniformBlockBindings));
+  HIKARI_CHECK_GL(glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &_maxUniformBlockSize));
 
   if (CanUseSsbo()) {
     HIKARI_CHECK_GL(glGetIntegerv(GL_SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, &_ssboAlign));
@@ -35,33 +38,39 @@ void FeatureOpenGL::Init() {
   _isInit = true;
 }
 
-int FeatureOpenGL::GetMajorVersion() const {
-  return _major;
+int FeatureOpenGL::GetMajorVersion() const { return _major; }
+
+int FeatureOpenGL::GetMinorVersion() const { return _minor; }
+
+int FeatureOpenGL::GetMinUboOffsetAlign() const { return _minUboOffsetAlign; }
+
+int FeatureOpenGL::GetSsboAlign() const { return _ssboAlign; }
+
+int FeatureOpenGL::GetMaxUniformLocation() const { return _maxUniformLocation; }
+
+int FeatureOpenGL::GetMaxUniformBlockBindings() const { return _maxUniformBlockBindings; }
+
+int FeatureOpenGL::GetMaxUniformBlockSize() const { return _maxUniformBlockSize; }
+
+int FeatureOpenGL::GetMaxGlslVersion() const {
+  auto major = GetMajorVersion();
+  auto minor = GetMinorVersion();
+  int result{};
+  if (major <= 3 && minor <= 3) {
+    result = 330;
+  } else if (major >= 4 && minor > 5) {
+    result = 450;
+  } else {
+    result = major * 100 + minor * 10;
+  }
+  return result;
 }
 
-int FeatureOpenGL::GetMinorVersion() const {
-  return _minor;
-}
+const std::string& FeatureOpenGL::GetHardwareInfo() const { return _deviceInfo; }
 
-int FeatureOpenGL::GetMinUboOffsetAlign() const {
-  return _minUboOffsetAlign;
-}
+const std::string& FeatureOpenGL::GetDriverInfo() const { return _driverInfo; }
 
-int FeatureOpenGL::GetSsboAlign() const {
-  return _ssboAlign;
-}
-
-const std::string& FeatureOpenGL::GetHardwareInfo() const {
-  return _deviceInfo;
-}
-
-const std::string& FeatureOpenGL::GetDriverInfo() const {
-  return _driverInfo;
-}
-
-bool FeatureOpenGL::IsExtensionSupported(const std::string& extName) const {
-  return _extensions.find(extName) != _extensions.end();
-}
+bool FeatureOpenGL::IsExtensionSupported(const std::string& extName) const { return _extensions.find(extName) != _extensions.end(); }
 
 bool FeatureOpenGL::CanUseSsbo() const {
   return (_major >= 4 && _minor >= 3);  //|| IsExtensionSupported("GL_ARB_shader_storage_buffer_object");
@@ -177,17 +186,10 @@ void CheckGLError(const char* callFuncName, const char* fileName, int line) {
 
 BufferOpenGL::BufferOpenGL() noexcept = default;
 
-BufferOpenGL::BufferOpenGL(BufferType type, BufferUsage usage, BufferAccess access) {
+BufferOpenGL::BufferOpenGL(const void* data, size_t size, BufferType type, BufferUsage usage, BufferAccess access) {
   _type = type;
   _usage = usage;
   _access = access;
-}
-
-BufferOpenGL::BufferOpenGL(const void* data,
-                           size_t size,
-                           BufferType type,
-                           BufferUsage usage,
-                           BufferAccess access) : BufferOpenGL(type, usage, access) {
   Store(data, size);
 }
 
@@ -247,8 +249,20 @@ void BufferOpenGL::Bind() const noexcept {
   HIKARI_CHECK_GL(glBindBuffer(MapTypeToTarget(_type), _handle));
 }
 
+void BufferOpenGL::UpdateData(GLintptr offset, GLsizei size, const void* data) const {
+  const auto& feature = FeatureOpenGL::Get();
+  if (feature.CanUseDirectStateAccess()) {
+    HIKARI_CHECK_GL(glNamedBufferSubData(GetHandle(), offset, size, data));
+  } else {
+    Bind();
+    HIKARI_CHECK_GL(glBufferSubData(MapTypeToTarget(GetType()), offset, size, data));
+  }
+}
+
 void BufferOpenGL::Store(const void* data, size_t size) {
-  assert(_type != BufferType::Unknown);
+  if (_type == BufferType::Unknown) {
+    throw OpenGLException("unknown buffer");
+  }
   if (IsValid()) {
     throw OpenGLException(std::string("buffer has stored data. handle id:") + std::to_string(_handle));
   }
@@ -292,13 +306,13 @@ GLbitfield BufferOpenGL::MapToBitField(BufferUsage usage, BufferAccess access) {
     flags |= GL_DYNAMIC_STORAGE_BIT;
   }
   switch (access) {
-    case BufferAccess::CpuReadOnly:
+    case BufferAccess::MapReadOnly:
       flags |= GL_MAP_READ_BIT;
       break;
-    case BufferAccess::CpuWriteOnly:
+    case BufferAccess::MapWriteOnly:
       flags |= GL_MAP_WRITE_BIT;
       break;
-    case BufferAccess::CpuReadWrite:
+    case BufferAccess::MapReadWrite:
       flags |= GL_MAP_READ_BIT;
       flags |= GL_MAP_WRITE_BIT;
       break;
@@ -310,13 +324,13 @@ GLbitfield BufferOpenGL::MapToBitField(BufferUsage usage, BufferAccess access) {
 
 GLenum BufferOpenGL::MapToUsage(BufferUsage usage, BufferAccess access) {
   if (usage == BufferUsage::Static) {
-    if (access == BufferAccess::CpuReadOnly) {
+    if (access == BufferAccess::MapReadOnly) {
       return GL_STATIC_READ;
     } else {
       return GL_STATIC_DRAW;
     }
   } else {
-    if (access == BufferAccess::CpuReadOnly) {
+    if (access == BufferAccess::MapReadOnly) {
       return GL_DYNAMIC_READ;
     } else {
       return GL_DYNAMIC_DRAW;
@@ -402,11 +416,10 @@ bool ShaderOpenGL::CompileFromSource(GLenum type, const std::string& source, GLu
   } else {
     int errorLen;
     HIKARI_CHECK_GL(glGetShaderiv(id, GL_INFO_LOG_LENGTH, &errorLen));
-    auto errorInfo = new char[errorLen];
-    HIKARI_CHECK_GL(glGetShaderInfoLog(id, errorLen, nullptr, errorInfo));
+    auto errorInfo = std::make_unique<char[]>(errorLen);
+    HIKARI_CHECK_GL(glGetShaderInfoLog(id, errorLen, nullptr, errorInfo.get()));
     std::cerr << "Shader Compile Error:\n"
               << errorInfo;
-    delete[] errorInfo;
     HIKARI_CHECK_GL(glDeleteShader(id));
   }
   return isSuccess;
@@ -419,6 +432,22 @@ ShaderAttributeLayout::ShaderAttributeLayout(const std::string& name,
                                              int index) noexcept {
   Name = name;
   Semantic = AttributeSemantic{type, index};
+}
+
+bool ShaderUniformBlock::Member::operator==(const ShaderUniformBlock::Member& o) const {
+  return Name == o.Name && Location == o.Location && Type == o.Type && Length == o.Length && Offset == o.Offset;
+}
+
+bool ShaderUniformBlock::Member::operator!=(const ShaderUniformBlock::Member& o) const {
+  return Name != o.Name || Location != o.Location || Type != o.Type || Length != o.Length || Offset != o.Offset;
+}
+
+bool ShaderUniformBlock::operator==(const ShaderUniformBlock& o) const {
+  return Name == o.Name && Index == o.Index && DataSize == o.DataSize && Members == o.Members;
+}
+
+bool ShaderUniformBlock::operator!=(const ShaderUniformBlock& o) const {
+  return Name != o.Name || Index != o.Index || DataSize != o.DataSize || Members != o.Members;
 }
 
 ProgramOpenGL::ProgramOpenGL() noexcept = default;
@@ -437,6 +466,7 @@ ProgramOpenGL::ProgramOpenGL(ProgramOpenGL&& other) noexcept {
   other._handle = 0;
   _attribs = std::move(other._attribs);
   _uniforms = std::move(other._uniforms);
+  _blocks = std::move(other._blocks);
   _nameToAttrib = std::move(other._nameToAttrib);
   _semanticToAttrib = std::move(other._semanticToAttrib);
   _nameToUni = std::move(other._nameToUni);
@@ -447,6 +477,7 @@ ProgramOpenGL& ProgramOpenGL::operator=(ProgramOpenGL&& other) noexcept {
   other._handle = 0;
   _attribs = std::move(other._attribs);
   _uniforms = std::move(other._uniforms);
+  _blocks = std::move(other._blocks);
   _nameToAttrib = std::move(other._nameToAttrib);
   _semanticToAttrib = std::move(other._semanticToAttrib);
   _nameToUni = std::move(other._nameToUni);
@@ -542,16 +573,25 @@ GLuint ProgramOpenGL::GetAttributeLocation(AttributeSemantic semantic) const {
   }
 }
 
-std::optional<const ShaderUniform*> ProgramOpenGL::GetUniform(const std::string& name) const {
+std::optional<ShaderUniform> ProgramOpenGL::TryGetUniform(const std::string& name) const {
   auto iter = _nameToUni.find(name);
   if (iter == _nameToUni.end()) {
     return std::nullopt;
   } else {
-    return std::make_optional(&_uniforms[iter->second]);
+    return std::make_optional(_uniforms[iter->second]);
   }
 }
 
-void ProgramOpenGL::Uniform(GLuint prog, GLint location, ParamType type, GLsizei count, const void* value) {
+const ShaderUniform& ProgramOpenGL::GetUniform(const std::string& name) const {
+  auto iter = _nameToUni.find(name);
+  if (iter == _nameToUni.end()) {
+    throw OpenGLException("unknown uniform name");
+  } else {
+    return _uniforms[iter->second];
+  }
+}
+
+void ProgramOpenGL::SubmitUniform(GLuint prog, GLint location, ParamType type, GLsizei count, const void* value) {
   const auto& feature = FeatureOpenGL::Get();
   if (feature.CanUseDirectStateAccess()) {
     switch (type) {
@@ -605,9 +645,6 @@ void ProgramOpenGL::Uniform(GLuint prog, GLint location, ParamType type, GLsizei
         break;
       }
       default: {
-        //std::cerr << "Unsupported uniform type:"
-        //          << static_cast<std::underlying_type<ParamType>::type>(type)
-        //          << '\n';
         throw OpenGLException("unsupported uniform type");
       }
     }
@@ -663,72 +700,25 @@ void ProgramOpenGL::Uniform(GLuint prog, GLint location, ParamType type, GLsizei
         break;
       }
       default: {
-        //std::cerr << "Unsupported uniform type:"
-        //          << static_cast<std::underlying_type<ParamType>::type>(type)
-        //          << '\n';
         throw OpenGLException("unsupported uniform type");
       }
     }
   }
 }
 
-void ProgramOpenGL::UniformMat4(GLuint prog, GLint index, const float* value) {
-  Uniform(prog, index, ParamType::Float32Mat4, 1, value);
-}
+void ProgramOpenGL::SubmitUniformMat4(GLuint prog, GLint index, const float* value) { SubmitUniform(prog, index, ParamType::Float32Mat4, 1, value); }
+void ProgramOpenGL::SubmitUniformFloat(GLuint prog, GLint index, float value) { SubmitUniform(prog, index, ParamType::Float32, 1, &value); }
+void ProgramOpenGL::SubmitUniformInt(GLuint prog, GLint index, int value) { SubmitUniform(prog, index, ParamType::Int32, 1, &value); }
+void ProgramOpenGL::SubmitUniformVec3(GLuint prog, GLint index, const float* value) { SubmitUniform(prog, index, ParamType::Float32Vec3, 1, value); }
+void ProgramOpenGL::SubmitUniformTex2d(GLuint prog, GLint index, GLuint handle) { SubmitUniform(prog, index, ParamType::Sampler2d, 1, &handle); }
+void ProgramOpenGL::SubmitUniformCubeMap(GLuint prog, GLint index, GLuint handle) { SubmitUniform(prog, index, ParamType::SamplerCubeMap, 1, &handle); }
+void ProgramOpenGL::UniformMat4(const std::string& name, const float* value) const { IfPresentUniform<const float*>(name, value, SubmitUniformMat4); }
 
-void ProgramOpenGL::Uniform(GLuint prog, GLint index, float value) {
-  Uniform(prog, index, ParamType::Float32, 1, &value);
-}
-
-void ProgramOpenGL::Uniform(GLuint prog, GLint index, int value) {
-  Uniform(prog, index, ParamType::Int32, 1, &value);
-}
-
-void ProgramOpenGL::UniformVec3(GLuint prog, GLint index, const float* value) {
-  Uniform(prog, index, ParamType::Float32Vec3, 1, value);
-}
-
-void ProgramOpenGL::UniformMat4(const std::string& name, const float* value) const {
-  auto uniform = GetUniform(name);
-  if (uniform.has_value()) {
-    Uniform(GetHandle(), (*uniform)->Location, ParamType::Float32Mat4, 1, value);
-  }
-}
-
-void ProgramOpenGL::Uniform(const std::string& name, float value) const {
-  auto uniform = GetUniform(name);
-  if (uniform.has_value()) {
-    Uniform(GetHandle(), (*uniform)->Location, ParamType::Float32, 1, &value);
-  }
-}
-
-void ProgramOpenGL::Uniform(const std::string& name, int value) const {
-  auto uniform = GetUniform(name);
-  if (uniform.has_value()) {
-    Uniform(GetHandle(), (*uniform)->Location, ParamType::Int32, 1, &value);
-  }
-}
-
-void ProgramOpenGL::UniformVec3(const std::string& name, const float* value) const {
-  auto uniform = GetUniform(name);
-  if (uniform.has_value()) {
-    Uniform(GetHandle(), (*uniform)->Location, ParamType::Float32Vec3, 1, value);
-  }
-}
-
-void ProgramOpenGL::UniformTexture2D(const std::string& name, GLuint handle) const {
-  auto uniform = GetUniform(name);
-  if (uniform.has_value()) {
-    Uniform(GetHandle(), (*uniform)->Location, ParamType::Sampler2d, 1, &handle);
-  }
-}
-
-void ProgramOpenGL::UniformCubeMap(const std::string& name, GLuint handle) const {
-  auto uniform = GetUniform(name);
-  if (uniform.has_value()) {
-    Uniform(GetHandle(), (*uniform)->Location, ParamType::SamplerCubeMap, 1, &handle);
-  }
-}
+void ProgramOpenGL::UniformFloat(const std::string& name, float value) const { IfPresentUniform<float>(name, value, SubmitUniformFloat); }
+void ProgramOpenGL::UniformInt(const std::string& name, int value) const { IfPresentUniform<int>(name, value, SubmitUniformInt); }
+void ProgramOpenGL::UniformVec3(const std::string& name, const float* value) const { IfPresentUniform<const float*>(name, value, SubmitUniformVec3); }
+void ProgramOpenGL::UniformTexture2D(const std::string& name, GLuint handle) const { IfPresentUniform<GLuint>(name, handle, SubmitUniformTex2d); }
+void ProgramOpenGL::UniformCubeMap(const std::string& name, GLuint handle) const { IfPresentUniform<GLuint>(name, handle, SubmitUniformCubeMap); }
 
 ParamType ProgramOpenGL::MapType(GLenum type) {
   switch (type) {
@@ -760,6 +750,39 @@ ParamType ProgramOpenGL::MapType(GLenum type) {
       return ParamType::SamplerCubeMap;
     default:
       return ParamType::Unknown;
+  }
+}
+
+size_t ProgramOpenGL::MapParamSize(ParamType type) {
+  switch (type) {
+    case Hikari::ParamType::Int32:
+      return sizeof(int32_t);
+    case Hikari::ParamType::Int32Vec2:
+      return sizeof(int32_t) * 2;
+    case Hikari::ParamType::Int32Vec3:
+      return sizeof(int32_t) * 3;
+    case Hikari::ParamType::Int32Vec4:
+      return sizeof(int32_t) * 4;
+    case Hikari::ParamType::Float32:
+      return sizeof(float_t);
+    case Hikari::ParamType::Float32Vec2:
+      return sizeof(float_t) * 2;
+    case Hikari::ParamType::Float32Vec3:
+      return sizeof(float_t) * 3;
+    case Hikari::ParamType::Float32Vec4:
+      return sizeof(float_t) * 4;
+    case Hikari::ParamType::Float32Mat2:
+      return sizeof(float_t) * 2 * 2;
+    case Hikari::ParamType::Float32Mat3:
+      return sizeof(float_t) * 3 * 3;
+    case Hikari::ParamType::Float32Mat4:
+      return sizeof(float_t) * 4 * 4;
+    case Hikari::ParamType::Sampler2d:
+      return sizeof(GLuint);
+    case Hikari::ParamType::SamplerCubeMap:
+      return sizeof(GLuint);
+    default:
+      throw OpenGLException("out of range");
   }
 }
 
@@ -810,36 +833,40 @@ bool ProgramOpenGL::Link(const ShaderOpenGL& vs,
       auto [_, isNameInsert] = result._nameToUni.emplace(result._uniforms[i].Name, i);
       assert(isNameInsert);
     }
+    result._blocks = ReflectActiveBlock(result.GetHandle());
     return true;
   } else {
     int errorLen;
     HIKARI_CHECK_GL(glGetProgramiv(id, GL_INFO_LOG_LENGTH, &errorLen));
-    auto errorInfo = new char[errorLen];
-    HIKARI_CHECK_GL(glGetProgramInfoLog(id, errorLen, nullptr, errorInfo));
+    auto errorInfo = std::make_unique<char[]>(errorLen);
+    HIKARI_CHECK_GL(glGetProgramInfoLog(id, errorLen, nullptr, errorInfo.get()));
     std::cerr << "ProgramOpenGL::Link():" << errorInfo << '\n';
-    delete[] errorInfo;
     HIKARI_CHECK_GL(glDeleteProgram(id));
     return false;
   }
 }
 
-ProgramOpenGL::AttribInfoArray ProgramOpenGL::ReflectActiveAttrib(GLuint prog) {
+std::vector<ShaderAttribute> ProgramOpenGL::ReflectActiveAttrib(GLuint prog) {
   auto id = prog;
   GLint attribCount;
   HIKARI_CHECK_GL(glGetProgramiv(id, GL_ACTIVE_ATTRIBUTES, &attribCount));
-  AttribInfoArray result;
+  std::vector<ShaderAttribute> result;
   result.reserve(attribCount);
+  GLint maxNameLen;
+  HIKARI_CHECK_GL(glGetProgramiv(id, GL_ACTIVE_ATTRIBUTE_MAX_LENGTH, &maxNameLen));
+  auto attrName = std::make_unique<char[]>(maxNameLen);
   for (int i = 0; i < attribCount; i++) {
-    char attribName[128];
     GLenum type = 0;
     GLint size = 0;
-    HIKARI_CHECK_GL(glGetActiveAttrib(id, i, sizeof(attribName), nullptr, &size, &type, attribName));
-    GLint location = HIKARI_CHECK_GL(glGetAttribLocation(id, attribName));
-    AttribInfo desc;
+    GLsizei nameSize = 0;
+    HIKARI_CHECK_GL(glGetActiveAttrib(id, i, maxNameLen, &nameSize, &size, &type, attrName.get()));
+    GLint location = HIKARI_CHECK_GL(glGetAttribLocation(id, attrName.get()));
+    ShaderAttribute desc;
     desc.Location = location;
     desc.Length = size;
-    desc.Name = std::string(attribName);
+    desc.Name = std::string(attrName.get(), nameSize);
     desc.Type = MapType(type);
+    desc.Semantic = AttributeSemantic(SemanticType::Unknown, 0);
     assert(desc.Type != ParamType::Unknown);
     assert(desc.Length >= 1);
     assert(desc.Location >= 0);
@@ -848,27 +875,86 @@ ProgramOpenGL::AttribInfoArray ProgramOpenGL::ReflectActiveAttrib(GLuint prog) {
   return result;
 }
 
-ProgramOpenGL::UniformInfoArray ProgramOpenGL::ReflectActiveUniform(GLuint prog) {
+std::vector<ShaderUniform> ProgramOpenGL::ReflectActiveUniform(GLuint prog) {
   auto id = prog;
   GLint uniformCount;
   HIKARI_CHECK_GL(glGetProgramiv(id, GL_ACTIVE_UNIFORMS, &uniformCount));
-  UniformInfoArray result;
+  std::vector<ShaderUniform> result;
   result.reserve(uniformCount);
+  GLint maxNameLen = 0;
+  HIKARI_CHECK_GL(glGetProgramiv(id, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxNameLen));
+  auto uniName = std::make_unique<char[]>(maxNameLen);
   for (int i = 0; i < uniformCount; i++) {
-    char uniformName[128];
     GLenum type = 0;
     GLint size = 0;
-    HIKARI_CHECK_GL(glGetActiveUniform(id, i, sizeof(uniformName), nullptr, &size, &type, uniformName));
-    GLint index = HIKARI_CHECK_GL(glGetUniformLocation(id, uniformName));
-    UniformInfo desc;
+    GLsizei nameSize = 0;
+    HIKARI_CHECK_GL(glGetActiveUniform(id, i, maxNameLen, &nameSize, &size, &type, uniName.get()));
+    GLint index = HIKARI_CHECK_GL(glGetUniformLocation(id, uniName.get()));
+    if (index < 0) {
+      continue;
+    }
+    ShaderUniform desc;
     desc.Location = index;
     desc.Length = size;
-    desc.Name = std::string(uniformName);
+    desc.Name = std::string(uniName.get(), nameSize);
     desc.Type = MapType(type);
-    assert(desc.Type != ParamType::Unknown);
-    assert(desc.Length >= 1);
-    assert(desc.Location >= 0);
+    if (desc.Type == ParamType::Unknown) {
+      throw OpenGLException("unknown Type");
+    }
+    if (desc.Length < 1) {
+      throw OpenGLException("invalid Length");
+    }
     result.emplace_back(desc);
+  }
+  return result;
+}
+
+std::vector<ShaderUniformBlock> ProgramOpenGL::ReflectActiveBlock(GLuint prog) {
+  auto id = prog;
+  GLint blockCount;
+  HIKARI_CHECK_GL(glGetProgramiv(id, GL_ACTIVE_UNIFORM_BLOCKS, &blockCount));
+  std::vector<ShaderUniformBlock> result;
+  result.reserve(blockCount);
+  for (int i = 0; i < blockCount; i++) {
+    int nameLen;
+    HIKARI_CHECK_GL(glGetActiveUniformBlockiv(id, i, GL_UNIFORM_BLOCK_NAME_LENGTH, &nameLen));
+    int uniCnt;
+    HIKARI_CHECK_GL(glGetActiveUniformBlockiv(id, i, GL_UNIFORM_BLOCK_ACTIVE_UNIFORMS, &uniCnt));
+    int dataSize;
+    HIKARI_CHECK_GL(glGetActiveUniformBlockiv(id, i, GL_UNIFORM_BLOCK_DATA_SIZE, &dataSize));
+    auto name = std::make_unique<char[]>(nameLen);
+    HIKARI_CHECK_GL(glGetActiveUniformBlockName(id, i, nameLen, nullptr, name.get()));
+    int index = HIKARI_CHECK_GL(glGetUniformBlockIndex(prog, name.get()));
+
+    auto indices = std::make_unique<int[]>(uniCnt);
+    auto indicesPtr = reinterpret_cast<uint32_t*>(indices.get());
+    HIKARI_CHECK_GL(glGetActiveUniformBlockiv(id, i, GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES, indices.get()));
+    auto nameLens = std::make_unique<int[]>(uniCnt);
+    HIKARI_CHECK_GL(glGetActiveUniformsiv(id, uniCnt, indicesPtr, GL_UNIFORM_NAME_LENGTH, nameLens.get()));
+    auto types = std::make_unique<int[]>(uniCnt);
+    HIKARI_CHECK_GL(glGetActiveUniformsiv(id, uniCnt, indicesPtr, GL_UNIFORM_TYPE, types.get()));
+    auto sizes = std::make_unique<int[]>(uniCnt);
+    HIKARI_CHECK_GL(glGetActiveUniformsiv(id, uniCnt, indicesPtr, GL_UNIFORM_SIZE, sizes.get()));
+    auto offsets = std::make_unique<int[]>(uniCnt);
+    HIKARI_CHECK_GL(glGetActiveUniformsiv(id, uniCnt, indicesPtr, GL_UNIFORM_OFFSET, offsets.get()));
+    std::vector<ShaderUniformBlock::Member> members(uniCnt);
+    for (int j = 0; j < uniCnt; j++) {
+      auto memName = std::make_unique<char[]>(nameLens[j]);
+      HIKARI_CHECK_GL(glGetActiveUniformName(id, indices[j], nameLens[j], nullptr, memName.get()));
+      members[j].Name = std::string(memName.get(), nameLens[j]);
+      members[j].Location = indices[j];
+      members[j].Type = MapType(types[j]);
+      members[j].Length = sizes[j];
+      members[j].Offset = offsets[j];
+    }
+
+    ShaderUniformBlock block;
+    block.Name = std::string(name.get());
+    block.Index = index;
+    block.DataSize = dataSize;
+    block.Members = std::move(members);
+
+    result.emplace_back(block);
   }
   return result;
 }

@@ -23,4 +23,8 @@ target_link_libraries(HikariCommon glad)
 target_link_libraries(HikariCommon glfw)
 target_link_libraries(HikariCommon stb_lib)
 target_link_libraries(HikariCommon tinyobjloader)
-target_include_directories(HikariCommon PUBLIC ${HikariInclude})
+target_link_libraries(HikariCommon glslang OSDependent OGLCompiler SPIRV SPVRemapper)
+target_link_libraries(HikariCommon spirv-cross-core spirv-cross-glsl spirv-cross-util)
+# glfw import include folder automatically
+target_include_directories(HikariCommon PUBLIC ${HikariInclude}) #hikari include dir
+glslang_add_build_info_dependency(HikariCommon) #glslang include dir

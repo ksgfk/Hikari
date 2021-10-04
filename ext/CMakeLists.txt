@@ -25,3 +25,16 @@ target_include_directories(stb_lib PUBLIC ${STB_DIR})
 set(TINY_OBJ_LOADER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tinyobjloader)
 add_library(tinyobjloader STATIC ${TINY_OBJ_LOADER_DIR}/tiny_obj_loader.cc)
 target_include_directories(tinyobjloader PUBLIC ${TINY_OBJ_LOADER_DIR})
+
+#glslang
+set(GLSLANG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/glslang)
+add_subdirectory(${GLSLANG_DIR})
+set(ENABLE_GLSLANG_BINARIES OFF CACHE BOOL "" FORCE)
+set(ENABLE_RTTI ON CACHE BOOL "" FORCE)
+set(ENABLE_EXCEPTIONS ON CACHE BOOL "" FORCE)
+set(ENABLE_CTEST OFF CACHE BOOL "" FORCE)
+
+#SPIRV-Cross
+set(SPIRV_CROSS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/SPIRV-Cross)
+add_subdirectory(${SPIRV_CROSS_DIR})
+set(SPIRV_CROSS_CLI OFF CACHE BOOL "" FORCE)

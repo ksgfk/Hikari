@@ -1,13 +1,13 @@
 #ifndef HIKARI_BRDF_INCLUDED
 #define HIKARI_BRDF_INCLUDED
 
-#include <Define.glsl>
+#include <Macros.glsl>
 
-struct __PbrMaterial {
+struct PbrMaterial {
   vec3 AlbedoMap;
   float Metallic;
   float Roughness;
-} PbrMaterial;
+};
 
 float DistributionGGX(vec3 N, vec3 H, float roughness) {
   float a = roughness * roughness;

@@ -48,6 +48,7 @@ class GameObject {
   Transform& GetTransform();
   const Transform& GetTransform() const;
   Application& GetApp();
+  RenderContextOpenGL& GetContext();
 
   void CreateVbo(const ImmutableModel& model, std::shared_ptr<BufferOpenGL>& vbo);
   void CreateVboIbo(const ImmutableModel& model,
@@ -103,6 +104,8 @@ class RenderPass : public IRenderPass {
   void ActiveProgram();
   void SetVertexBuffer(const BufferOpenGL& vbo, const VertexBufferLayout& layout);
   void SetIndexBuffer(const BufferOpenGL& ibo);
+  void SetVertexBuffer(const std::shared_ptr<BufferOpenGL>& vbo, const VertexBufferLayout& layout);
+  void SetIndexBuffer(const std::shared_ptr<BufferOpenGL>& ibo);
   uint32_t BindTexture(const TextureOpenGL& texture);
   void Draw(int vertexCount, int vertexStart);
   void DrawIndexed(int indexCount, int indexStart);
@@ -136,6 +139,7 @@ class Application {
   const Input& GetInput() const;
   MainCamera& GetCamera();
   const std::filesystem::path& GetAssetPath() const;
+  const std::filesystem::path& GetShaderLibPath() const;
   std::shared_ptr<GameObject> GetGameObject(const std::string& name);
   std::any& GetSharedObject(const std::string& name);
   float GetDeltaTime();
@@ -147,7 +151,8 @@ class Application {
   void AddGameObject(const std::shared_ptr<GameObject>& gameObject);
   void SetCamera(std::unique_ptr<Camera>&& camera);
   void SetAssetPath(const std::filesystem::path&);
-  void SetAssetPath(int argc, char** argv);
+  void SetShaderLibPath(const std::filesystem::path&);
+  void GetArgs(int argc, char** argv);
 
   template <class PassType, class... Args>
   void CreatePass(Args&&... args) {
@@ -184,7 +189,7 @@ class Application {
   WindowCreateInfo _wdInfo;
   ContextOpenGLDescription _ctxDesc;
   std::filesystem::path _assetRoot;
-
+  std::filesystem::path _shaderLibRoot;
   NativeWindow _window;
   RenderContextOpenGL _context;
   std::shared_ptr<MainCamera> _camera;
@@ -194,7 +199,6 @@ class Application {
   std::vector<std::shared_ptr<IRenderPass>> _renderPasses;
   std::unordered_map<std::string, std::shared_ptr<IRenderPass>> _renderPassNameDict;
   std::unordered_map<std::string, std::any> _shared;
-
   int64_t _time{};
   int64_t _deltaTime{};
   std::chrono::time_point<std::chrono::high_resolution_clock> _lastFrameTime{};

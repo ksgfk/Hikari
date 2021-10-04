@@ -3,6 +3,7 @@
 #include <iostream>
 #include <algorithm>
 #include <thread>
+#include <cstring>
 
 #include <hikari/opengl.h>
 
@@ -112,16 +113,31 @@ const Transform& GameObject::GetTransform() const { return _transform; }
 
 Application& GameObject::GetApp() { return Application::GetInstance(); }
 
+RenderContextOpenGL& GameObject::GetContext() { return GetApp().GetContext(); }
+
 void GameObject::CreateVbo(const ImmutableModel& model, std::shared_ptr<BufferOpenGL>& vbo) {
-  vbo = GetApp().GetContext().CreateEmptyBuffer(BufferType::VertexBuffer);
-  CreateVboFormModelPNT(model, *vbo);
+  auto d = GenVboDataPNT(model.GetPosition(), model.GetNormals(), model.GetTexCoords(), model.GetIndices());
+  auto data = d.data();
+  auto size = d.size() * sizeof(decltype(d)::value_type);
+  vbo = GetApp().GetContext().CreateVertexBuffer(data, size);
 }
 
 void GameObject::CreateVboIbo(const ImmutableModel& model,
                               std::shared_ptr<BufferOpenGL>& vbo, std::shared_ptr<BufferOpenGL>& ibo) {
-  vbo = GetApp().GetContext().CreateEmptyBuffer(BufferType::VertexBuffer);
-  ibo = GetApp().GetContext().CreateEmptyBuffer(BufferType::IndexBuffer);
-  CreateVboAndIboFromModelPNT(model, *vbo, *ibo);
+  auto vertex = GenVboDataPNT(model.GetPosition(), model.GetNormals(), model.GetTexCoords());
+  auto vertexData = vertex.data();
+  auto vertexSize = vertex.size() * sizeof(decltype(vertex)::value_type);
+  vbo = GetApp().GetContext().CreateVertexBuffer(vertexData, vertexSize);
+  std::vector<uint32_t> indices(model.GetIndexCount());
+  for (size_t i = 0; i < model.GetIndexCount(); i++) {
+    if (model.GetIndices()[i] >= std::numeric_limits<uint32_t>::max()) {
+      throw AppRuntimeException("model vertex index out of range");
+    }
+    indices[i] = static_cast<decltype(indices)::value_type>(model.GetIndices()[i]);
+  }
+  auto indexData = indices.data();
+  auto indexSize = indices.size() * sizeof(decltype(indices)::value_type);
+  ibo = GetApp().GetContext().CreateIndexBuffer(indexData, indexSize);
 }
 
 MainCamera::MainCamera() : GameObject("Main Camera") {}
@@ -217,6 +233,14 @@ void RenderPass::SetIndexBuffer(const BufferOpenGL& ibo) {
   vao.SetIndexBuffer(ibo.GetHandle());
 }
 
+void RenderPass::SetVertexBuffer(const std::shared_ptr<BufferOpenGL>& vbo, const VertexBufferLayout& layout) {
+  SetVertexBuffer(*vbo, layout);
+}
+
+void RenderPass::SetIndexBuffer(const std::shared_ptr<BufferOpenGL>& ibo) {
+  SetIndexBuffer(*ibo);
+}
+
 uint32_t RenderPass::BindTexture(const TextureOpenGL& texture) {
   auto slot = _textureSlot;
   HIKARI_CHECK_GL(glActiveTexture(GL_TEXTURE0 + slot));
@@ -294,7 +318,11 @@ void Application::Awake() {
   std::cout << "opengl context loaded" << std::endl;
   std::cout << "renderer:" << feature.GetHardwareInfo() << std::endl;
   std::cout << "driver:" << feature.GetDriverInfo() << std::endl;
-  _context._isValid = true;
+  if (_shaderLibRoot.empty()) {
+    _context.Init(_assetRoot / "shaders");
+  } else {
+    _context.Init(_shaderLibRoot);
+  }
   if (_camera->Camera == nullptr) {
     _camera->Camera = std::make_unique<PerspectiveCamera>();  //假装是透视相机
   }
@@ -307,13 +335,21 @@ void Application::Awake() {
 }
 
 void Application::Run() {
+  const auto& feature = FeatureOpenGL::Get();
   while (!_window.ShouldClose()) {
     _input.Update(_window.GetHandle());
     for (auto& gameObject : _gameObjects) {
       gameObject->OnUpdate();
     }
+    _context.SubmitGlobalUnifroms();
     for (auto& renderPass : _renderPasses) {
-      renderPass->OnUpdate();
+      if (feature.GetMajorVersion() >= 4 && feature.GetMinorVersion() >= 3) {
+        HIKARI_CHECK_GL(glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, renderPass->GetName().c_str()));
+        renderPass->OnUpdate();
+        HIKARI_CHECK_GL(glPopDebugGroup());
+      } else {
+        renderPass->OnUpdate();
+      }
     }
     _window.PollEvents();
     _window.SwapBuffers();
@@ -325,7 +361,6 @@ void Application::Run() {
   _renderPasses.clear();
   _context.Destroy();
   _window.Destroy();  //不知道为啥ubuntu在析构函数里销毁窗口就报错...make ubuntu happy :(
-  _context._isValid = false;
 }
 
 void Application::AddPass(const std::shared_ptr<IRenderPass>& pass) {
@@ -371,18 +406,41 @@ MainCamera& Application::GetCamera() { return *_camera; }
 
 void Application::SetAssetPath(const std::filesystem::path& root) { _assetRoot = root; }
 
-void Application::SetAssetPath(int argc, char** argv) {
-  std::string rootPath;
+void Application::SetShaderLibPath(const std::filesystem::path& root) { _shaderLibRoot = root; }
+
+void Application::GetArgs(int argc, char** argv) {
   if (argc <= 1) {
+    std::cout << "Command-line arguments options:\n"
+              << "  -A | --asset    Set asset root path\n"
+              << "  --shader-lib    Set shader library root path.Default location is \"shaders\" folder in the asset path\n"
+              << std::endl;
+  }
+  for (int i = 1; i < argc;) {
+    if (strncmp(argv[i], "--asset", 7) == 0 || strncmp(argv[i], "-A", 2) == 0) {
+      if (i == argc - 1) {
+        throw AppRuntimeException("invalid argument.--asset/-A must follow asset path");
+      }
+      SetAssetPath(argv[i + 1]);
+      i += 2;
+    } else if (strncmp(argv[i], "--shader-lib", 12) == 0) {
+      SetShaderLibPath(argv[i + 1]);
+      i += 2;
+    } else {
+      std::cout << "unknown argument " << argv[i] << std::endl;
+      i++;
+    }
+  }
+  if (_assetRoot.empty()) {
+    std::string rootPath;
     std::cout << "Please input asset path:";
     std::cin >> rootPath;
-  } else {
-    rootPath = std::string(argv[1]);
+    SetAssetPath(rootPath);
   }
-  _assetRoot = rootPath;
 }
 
 const std::filesystem::path& Application::GetAssetPath() const { return _assetRoot; }
+
+const std::filesystem::path& Application::GetShaderLibPath() const { return _shaderLibRoot; }
 
 std::any& Application::GetSharedObject(const std::string& name) {
   auto iter = _shared.find(name);

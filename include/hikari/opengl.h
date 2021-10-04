@@ -8,6 +8,7 @@
 #include <optional>
 #include <memory>
 #include <stdexcept>
+#include <functional>
 
 #include <hikari/opengl_header.h>
 
@@ -51,6 +52,10 @@ class FeatureOpenGL {
   int GetMinorVersion() const;
   int GetMinUboOffsetAlign() const;
   int GetSsboAlign() const;
+  int GetMaxUniformLocation() const;
+  int GetMaxUniformBlockBindings() const;
+  int GetMaxUniformBlockSize() const;
+  int GetMaxGlslVersion() const;
   const std::string& GetHardwareInfo() const;
   const std::string& GetDriverInfo() const;
   bool IsExtensionSupported(const std::string& extName) const;
@@ -68,6 +73,9 @@ class FeatureOpenGL {
   bool _isInit{};
   int _major{};
   int _minor{};
+  int _maxUniformLocation{};
+  int _maxUniformBlockBindings{};
+  int _maxUniformBlockSize{};
   int _minUboOffsetAlign{};
   int _ssboAlign{};
   std::string _driverInfo;
@@ -124,17 +132,16 @@ enum class BufferUsage {
 };
 
 enum class BufferAccess {
-  Immutable,
-  CpuReadOnly,
-  CpuWriteOnly,
-  CpuReadWrite
+  NoMap,
+  MapReadOnly,
+  MapWriteOnly,
+  MapReadWrite
 };
 
 class BufferOpenGL : public ObjectOpenGL {
  public:
   BufferOpenGL() noexcept;
-  BufferOpenGL(BufferType, BufferUsage = BufferUsage::Static, BufferAccess = BufferAccess::Immutable);
-  BufferOpenGL(const void*, size_t, BufferType, BufferUsage = BufferUsage::Static, BufferAccess = BufferAccess::Immutable);
+  BufferOpenGL(const void*, size_t, BufferType, BufferUsage = BufferUsage::Static, BufferAccess = BufferAccess::NoMap);
   BufferOpenGL(BufferOpenGL&&) noexcept;
   BufferOpenGL& operator=(BufferOpenGL&&) noexcept;
   ~BufferOpenGL() noexcept override;
@@ -146,8 +153,7 @@ class BufferOpenGL : public ObjectOpenGL {
   BufferUsage GetUsage() const noexcept;
   BufferAccess GetAccess() const noexcept;
   void Bind() const noexcept;
-
-  void Store(const void*, size_t);
+  void UpdateData(GLintptr offset, GLsizei size, const void* data) const;
 
   static GLenum MapTypeToTarget(BufferType);
   static GLenum MapToUsage(BufferUsage, BufferAccess);
@@ -155,6 +161,8 @@ class BufferOpenGL : public ObjectOpenGL {
 
  private:
   void Delete();
+  void Store(const void*, size_t);
+
   GLuint _handle{};
   BufferType _type{};
   BufferUsage _usage{};
@@ -262,13 +270,26 @@ struct ShaderUniform {
   int Location = -1;
 };
 
+struct ShaderUniformBlock {
+  struct Member {
+    std::string Name;
+    int Location = -1;
+    ParamType Type = ParamType::Unknown;
+    int Length = 0;
+    int Offset = 0;
+    bool operator==(const Member& o) const;
+    bool operator!=(const Member& o) const;
+  };
+  std::string Name;
+  int Index = -1;
+  int DataSize{};
+  std::vector<Member> Members;
+  bool operator==(const ShaderUniformBlock& o) const;
+  bool operator!=(const ShaderUniformBlock& o) const;
+};
+
 class ProgramOpenGL : public ObjectOpenGL {
  public:
-  using AttribInfo = ShaderUniform;
-  using UniformInfo = ShaderUniform;
-  using AttribInfoArray = std::vector<AttribInfo>;    //只用来记录attrib反射的信息
-  using UniformInfoArray = std::vector<UniformInfo>;  //只用来记录uniform反射的信息
-
   ProgramOpenGL() noexcept;
   ProgramOpenGL(const ShaderOpenGL& vs, const ShaderOpenGL& fs, const ShaderAttributeLayouts& desc);
   ProgramOpenGL(ProgramOpenGL&&) noexcept;
@@ -284,35 +305,51 @@ class ProgramOpenGL : public ObjectOpenGL {
   int GetBindingPoint(AttributeSemantic) const;
   GLuint GetAttributeLocation(const std::string&) const;
   GLuint GetAttributeLocation(AttributeSemantic) const;
-  std::optional<const ShaderUniform*> GetUniform(const std::string&) const;
+  std::optional<ShaderUniform> TryGetUniform(const std::string&) const;
+  const ShaderUniform& GetUniform(const std::string&) const;
   constexpr const std::vector<ShaderAttribute>& GetAttributes() const { return _attribs; }
   constexpr const std::vector<ShaderUniform>& GetUniforms() const { return _uniforms; }
+  constexpr const std::vector<ShaderUniformBlock>& GetBlocks() const { return _blocks; }
 
-  static void Uniform(GLuint prog, GLint location, ParamType type, GLsizei count, const void* value);
-  static void UniformMat4(GLuint prog, GLint index, const float* value);
-  static void Uniform(GLuint prog, GLint index, float value);
-  static void Uniform(GLuint prog, GLint index, int value);
-  static void UniformVec3(GLuint prog, GLint index, const float* value);
+  static void SubmitUniform(GLuint prog, GLint location, ParamType type, GLsizei count, const void* value);
+  static void SubmitUniformMat4(GLuint prog, GLint index, const float* value);
+  static void SubmitUniformFloat(GLuint prog, GLint index, float value);
+  static void SubmitUniformInt(GLuint prog, GLint index, int value);
+  static void SubmitUniformVec3(GLuint prog, GLint index, const float* value);
+  static void SubmitUniformTex2d(GLuint prog, GLint index, GLuint handle);
+  static void SubmitUniformCubeMap(GLuint prog, GLint index, GLuint handle);
   void UniformMat4(const std::string& name, const float* value) const;
-  void Uniform(const std::string& name, float value) const;
-  void Uniform(const std::string& name, int value) const;
+  void UniformFloat(const std::string& name, float value) const;
+  void UniformInt(const std::string& name, int value) const;
   void UniformVec3(const std::string& name, const float* value) const;
   void UniformTexture2D(const std::string& name, GLuint handle) const;
   void UniformCubeMap(const std::string& name, GLuint handle) const;
 
   static ParamType MapType(GLenum type);
+  static size_t MapParamSize(ParamType type);
   static bool Link(const ShaderOpenGL& vs,
                    const ShaderOpenGL& fs,
                    const ShaderAttributeLayouts& desc,
                    ProgramOpenGL& result);
-  static AttribInfoArray ReflectActiveAttrib(GLuint prog);
-  static UniformInfoArray ReflectActiveUniform(GLuint prog);
+  static std::vector<ShaderAttribute> ReflectActiveAttrib(GLuint prog);
+  static std::vector<ShaderUniform> ReflectActiveUniform(GLuint prog);
+  static std::vector<ShaderUniformBlock> ReflectActiveBlock(GLuint prog);
 
  private:
   void Delete();
+  template <class T>
+  using IfPresentAction = std::function<void(GLuint, GLint, T)>;
+  template <class T>
+  void IfPresentUniform(const std::string name, T value, IfPresentAction<T> func) const {
+    auto uniform = TryGetUniform(name);
+    if (uniform.has_value()) {
+      func(GetHandle(), uniform->Location, std::forward<T>(value));
+    }
+  }
   GLuint _handle{};
   std::vector<ShaderAttribute> _attribs;
   std::vector<ShaderUniform> _uniforms;
+  std::vector<ShaderUniformBlock> _blocks;
   std::unordered_map<std::string_view, size_t> _nameToAttrib;
   std::unordered_map<AttributeSemantic, size_t, SemanticHash> _semanticToAttrib;
   std::unordered_map<std::string_view, size_t> _nameToUni;
