@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <map>
+#include <fstream>
 
 #include <stb_image.h>
 #include <tiny_obj_loader.h>
@@ -9,19 +10,21 @@
 namespace Hikari {
 Asset::Asset() noexcept = default;
 
-Asset::~Asset() = default;
+Asset::~Asset() noexcept = default;
 
 ImmutableBitmap::ImmutableBitmap() noexcept = default;
 
-ImmutableBitmap::~ImmutableBitmap() {
+ImmutableBitmap::~ImmutableBitmap() noexcept {
   if (_data != nullptr) {
     stbi_image_free(_data);
     _data = nullptr;
   }
 }
 
-ImmutableBitmap::ImmutableBitmap(const std::string& name, const std::filesystem::path& path, bool isFilpY) noexcept {
-  LoadFromDisk(name, path, isFilpY, *this);
+ImmutableBitmap::ImmutableBitmap(const std::string& name, const std::filesystem::path& path, bool isFilpY) {
+  if (!LoadFromDisk(name, path, isFilpY, *this)) {
+    throw AssetLoadException("can't load from disk");
+  }
 }
 
 ImmutableBitmap::ImmutableBitmap(ImmutableBitmap&& other) noexcept {
@@ -91,8 +94,10 @@ bool ImmutableBitmap::LoadFromDisk(const std::string& name,
 
 ImmutableModel::ImmutableModel() noexcept = default;
 
-ImmutableModel::ImmutableModel(const std::string& name, const std::filesystem::path& path) noexcept {
-  LoadFromFile(name, path, *this);
+ImmutableModel::ImmutableModel(const std::string& name, const std::filesystem::path& path) {
+  if (!LoadFromFile(name, path, *this)) {
+    throw AssetLoadException("can't load from disk");
+  }
 }
 
 ImmutableModel::ImmutableModel(const std::string& name,
@@ -124,7 +129,7 @@ ImmutableModel& ImmutableModel::operator=(ImmutableModel&& other) noexcept {
   return *this;
 }
 
-ImmutableModel::~ImmutableModel() {
+ImmutableModel::~ImmutableModel() noexcept {
   _positions.clear();
   _normals.clear();
   _texcoords.clear();
@@ -302,30 +307,30 @@ ImmutableModel ImmutableModel::CreateSphere(const std::string& name, float radiu
 }
 
 ImmutableModel ImmutableModel::CreateCube(const std::string& name, float halfExtend) {
-  static const float cubeVertices[] = {-1.0f, -1.0f, -1.0f, +1.0f, -1.0f, -1.0f, +1.0f, +1.0f, +1.0f, -1.0f, +1.0f, +1.0f, +1.0f, -1.0f, -1.0f, +1.0f,
+  constexpr const float cubeVertices[] = {-1.0f, -1.0f, -1.0f, +1.0f, -1.0f, -1.0f, +1.0f, +1.0f, +1.0f, -1.0f, +1.0f, +1.0f, +1.0f, -1.0f, -1.0f, +1.0f,
 
-                                       -1.0f, +1.0f, -1.0f, +1.0f, -1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, -1.0f, +1.0f,
+                                          -1.0f, +1.0f, -1.0f, +1.0f, -1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, -1.0f, +1.0f,
 
-                                       -1.0f, -1.0f, -1.0f, +1.0f, -1.0f, +1.0f, -1.0f, +1.0f, +1.0f, +1.0f, -1.0f, +1.0f, +1.0f, -1.0f, -1.0f, +1.0f,
+                                          -1.0f, -1.0f, -1.0f, +1.0f, -1.0f, +1.0f, -1.0f, +1.0f, +1.0f, +1.0f, -1.0f, +1.0f, +1.0f, -1.0f, -1.0f, +1.0f,
 
-                                       -1.0f, -1.0f, +1.0f, +1.0f, -1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, -1.0f, +1.0f, +1.0f,
+                                          -1.0f, -1.0f, +1.0f, +1.0f, -1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, -1.0f, +1.0f, +1.0f,
 
-                                       -1.0f, -1.0f, -1.0f, +1.0f, -1.0f, -1.0f, +1.0f, +1.0f, -1.0f, +1.0f, +1.0f, +1.0f, -1.0f, +1.0f, -1.0f, +1.0f,
+                                          -1.0f, -1.0f, -1.0f, +1.0f, -1.0f, -1.0f, +1.0f, +1.0f, -1.0f, +1.0f, +1.0f, +1.0f, -1.0f, +1.0f, -1.0f, +1.0f,
 
-                                       +1.0f, -1.0f, -1.0f, +1.0f, +1.0f, -1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, -1.0f, +1.0f};
+                                          +1.0f, -1.0f, -1.0f, +1.0f, +1.0f, -1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, +1.0f, -1.0f, +1.0f};
 
-  static const float cubeNormals[] = {0.0f, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f,
+  constexpr const float cubeNormals[] = {0.0f, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f,
 
-                                      0.0f, +1.0f, 0.0f, 0.0f, +1.0f, 0.0f, 0.0f, +1.0f, 0.0f, 0.0f, +1.0f, 0.0f,
+                                         0.0f, +1.0f, 0.0f, 0.0f, +1.0f, 0.0f, 0.0f, +1.0f, 0.0f, 0.0f, +1.0f, 0.0f,
 
-                                      0.0f, 0.0f, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, -1.0f,
+                                         0.0f, 0.0f, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, -1.0f,
 
-                                      0.0f, 0.0f, +1.0f, 0.0f, 0.0f, +1.0f, 0.0f, 0.0f, +1.0f, 0.0f, 0.0f, +1.0f,
+                                         0.0f, 0.0f, +1.0f, 0.0f, 0.0f, +1.0f, 0.0f, 0.0f, +1.0f, 0.0f, 0.0f, +1.0f,
 
-                                      -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
+                                         -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
 
-                                      +1.0f, 0.0f, 0.0f, +1.0f, 0.0f, 0.0f, +1.0f, 0.0f, 0.0f, +1.0f, 0.0f, 0.0f};
-  static const float cubeTexCoords[] =
+                                         +1.0f, 0.0f, 0.0f, +1.0f, 0.0f, 0.0f, +1.0f, 0.0f, 0.0f, +1.0f, 0.0f, 0.0f};
+  constexpr const float cubeTexCoords[] =
       {0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f,
 
        0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,
@@ -338,7 +343,7 @@ ImmutableModel ImmutableModel::CreateCube(const std::string& name, float halfExt
 
        1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f};
 
-  static const size_t cubeIndices[] =
+  constexpr const size_t cubeIndices[] =
       {0, 2, 1, 0, 3, 2,
        4, 5, 6, 4, 6, 7,
        8, 9, 10, 8, 10, 11,
@@ -365,5 +370,27 @@ ImmutableModel ImmutableModel::CreateCube(const std::string& name, float halfExt
   std::vector<size_t> indices(cubeIndices, cubeIndices + numberIndices);
   return ImmutableModel(name, std::move(vertices), std::move(normals), std::move(texCoords), std::move(indices));
 }
+
+ImmutableText::ImmutableText() noexcept = default;
+
+ImmutableText::ImmutableText(const std::string& name, const std::filesystem::path& path) {
+  auto size = std::filesystem::file_size(path);
+  std::ifstream stream(path, std::ios_base::in | std::ios::binary);
+  _text.resize(size, '\0');
+  stream.read(_text.data(), size);
+}
+
+ImmutableText::~ImmutableText() noexcept = default;
+
+const std::string& ImmutableText::GetName() const { return _name; }
+
+bool ImmutableText::IsValid() const { return _text.empty(); }
+
+void ImmutableText::Release() {
+  _text.clear();
+  _text.shrink_to_fit();
+}
+
+const std::string& ImmutableText::GetText() const { return _text; }
 
 }  // namespace Hikari

@@ -131,9 +131,9 @@ void OrbitControls::ApplyCamera(Camera* camera) const {
     auto p = phi - orbit.Y() * factor;
     p = std::clamp(p, EPSILON, PI - EPSILON);
     Vector3f offset(0);
-    offset.X() = radius * (float)sin(p) * (float)sin(t);
-    offset.Y() = radius * (float)cos(p);
-    offset.Z() = radius * (float)sin(p) * (float)cos(t);
+    offset.X() = radius * std::sin(p) * std::sin(t);
+    offset.Y() = radius * std::cos(p);
+    offset.Z() = radius * std::sin(p) * std::cos(t);
     camera->SetPosition(camTar + offset);
   }
   if (_deltaPan != Vector2f(0)) {

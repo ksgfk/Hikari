@@ -6,8 +6,24 @@
 #endif
 
 layout(std140) uniform HikariLight {
-  vec3 a_LightRadiance[MAX_LIGHT_COUNT];
-  vec3 a_LightDirection[MAX_LIGHT_COUNT];
+  vec3 u_LightRadianceDir[MAX_LIGHT_COUNT];
+  vec3 u_LightDirectionDir[MAX_LIGHT_COUNT];
+  vec3 u_LightRadiancePoint[MAX_LIGHT_COUNT];
+  vec3 u_LightPositionPoint[MAX_LIGHT_COUNT];
+  int u_LightDirCount;
+  int u_LightPointCount;
 };
+
+vec3 GetDirLightRadiance(int idx) {
+  return u_LightRadianceDir[idx];
+}
+
+vec3 GetDirLightDirection(int idx) {
+  return normalize(u_LightDirectionDir[idx]);
+}
+
+int GetDirLightCount() {
+  return u_LightDirCount;
+}
 
 #endif

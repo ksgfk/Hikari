@@ -379,7 +379,13 @@ static EShLanguage MapShaderTypToGlslang(ShaderType type) {
   }
 }
 
-bool RenderContextOpenGL::ProprocessShader(ShaderType type, const std::string& source, std::string& res) {
+static void __OutputStrLog(const char* str) {
+  if (str && str[0]) {
+    std::cout << str << std::endl;
+  }
+}
+
+bool RenderContextOpenGL::PreprocessShader(ShaderType type, const std::string& source, std::string& res) {
   //CheckInit();
   EShLanguage lang = MapShaderTypToGlslang(type);
   glslang::InitializeProcess();
@@ -394,6 +400,20 @@ bool RenderContextOpenGL::ProprocessShader(ShaderType type, const std::string& s
   shader->setPreamble("\n#extension GL_GOOGLE_include_directive : enable\n");  //启用#include
   std::string result;
   bool proc = shader->preprocess(&__BuiltInRes, 110, ECoreProfile, false, false, EShMsgDefault, &result, _includer);
+  if (proc) {
+    proc = shader->parse(&__BuiltInRes, 110, false, EShMsgDefault, _includer);
+    if (!proc) {
+      std::cout << "--------------parse info---------------" << std::endl;
+      __OutputStrLog(shader->getInfoLog());
+      __OutputStrLog(shader->getInfoDebugLog());
+      std::cout << "---------------------------------------" << std::endl;
+    }
+  } else {
+    std::cout << "------------preprocess info------------" << std::endl;
+    __OutputStrLog(shader->getInfoLog());
+    __OutputStrLog(shader->getInfoDebugLog());
+    std::cout << "---------------------------------------" << std::endl;
+  }
   if (proc) {
     const std::string verCmd("#version");
     const std::string lineCmd("#line");
@@ -418,8 +438,6 @@ bool RenderContextOpenGL::ProprocessShader(ShaderType type, const std::string& s
         res.append("\n");
       }
     }
-  } else {
-    res = shader->getInfoLog();
   }
   glslang::InitializeProcess();
   return proc;
@@ -536,58 +554,76 @@ void RenderContextOpenGL::SubmitGlobalUnifroms() const {
   }
 }
 
-void RenderContextOpenGL::SetGlobalUniformData(const std::string& name, size_t dataSize, int length, const void* data) {
+void RenderContextOpenGL::SetGlobalUniformData(const std::string& name,
+                                               size_t dataSize,
+                                               int length,
+                                               int align,
+                                               const void* data) {
   auto iter = _globalUniforms.find(name);
   if (iter == _globalUniforms.end()) {
     return;
   }
   const auto& uniform = iter->second;
-  SetGlobalUniformData(uniform, dataSize, length, data);
+  SetGlobalUniformData(uniform, dataSize, length, align, data);
 }
 
-void RenderContextOpenGL::SetGlobalUniformData(const GlobalUniform& uniform, size_t dataSize, int length, const void* data) {
+void RenderContextOpenGL::SetGlobalUniformData(const GlobalUniform& uniform,
+                                               size_t dataSize,
+                                               int length,
+                                               int align,
+                                               const void* data) {
   if (ProgramOpenGL::MapParamSize(uniform.Info.Type) != dataSize) {
     throw RenderContextException("invalid data size");
   }
-  if (length <= 0 || length > uniform.Info.Length) {
+  if (length < 0 || length > uniform.Info.Length) {
     throw RenderContextException("out of range");
   }
-  auto allSize = dataSize * length;
+  if (length > 1 && align != uniform.Info.Align) {
+    throw RenderContextException("invalid align");
+  }
+  if (length == 0) {
+    return;
+  }
+  auto allSize = length > 1 ? size_t(align) * size_t(length) : dataSize;
   auto& block = _globalBlocks[uniform.BlockHandle];
   auto head = reinterpret_cast<const std::uint8_t*>(data);
   auto target = block.Data.begin() + uniform.Info.Offset;
   std::copy(head, head + allSize, target);
 }
 
-void RenderContextOpenGL::SetGlobalUniform(const std::string& name, size_t dataSize, int length, const void* data) {
+void RenderContextOpenGL::SetGlobalUniform(const std::string& name,
+                                           size_t dataSize,
+                                           int length,
+                                           int align,
+                                           const void* data) {
   auto iter = _globalUniforms.find(name);
   if (iter == _globalUniforms.end()) {
     return;
   }
   const auto& uniform = iter->second;
-  SetGlobalUniformData(uniform, dataSize, length, data);
+  SetGlobalUniformData(uniform, dataSize, length, align, data);
   //auto& block = _globalBlocks[uniform.BlockHandle];
   //block.Ubo->UpdateData(uniform.Info.Offset, int(dataSize * length), data);
 }
 
-void RenderContextOpenGL::SetGlobalFloat(const std::string& name, float value) { SetGlobalUniform(name, sizeof(float), 1, &value); }
-void RenderContextOpenGL::SetGlobalInt(const std::string& name, int value) { SetGlobalUniform(name, sizeof(int), 1, &value); }
-void RenderContextOpenGL::SetGlobalMat4(const std::string& name, const Matrix4f& value) { SetGlobalUniform(name, sizeof(Matrix4f), 1, value.GetAddress()); }
-void RenderContextOpenGL::SetGlobalVec3(const std::string& name, const Vector3f& value) { SetGlobalUniform(name, sizeof(Vector3f), 1, value.GetAddress()); }
+void RenderContextOpenGL::SetGlobalFloat(const std::string& name, float value) { SetGlobalUniform(name, sizeof(float), 1, 0, &value); }
+void RenderContextOpenGL::SetGlobalInt(const std::string& name, int value) { SetGlobalUniform(name, sizeof(int), 1, 0, &value); }
+void RenderContextOpenGL::SetGlobalMat4(const std::string& name, const Matrix4f& value) { SetGlobalUniform(name, sizeof(Matrix4f), 1, 0, value.GetAddress()); }
+void RenderContextOpenGL::SetGlobalVec3(const std::string& name, const Vector3f& value) { SetGlobalUniform(name, sizeof(Vector3f), 1, 0, value.GetAddress()); }
 void RenderContextOpenGL::SetGlobalTex2d(const std::string& name, const TextureOpenGL& tex2d) {
   auto handle = tex2d.GetHandle();
-  SetGlobalUniform(name, sizeof(decltype(handle)), 1, &handle);
+  SetGlobalUniform(name, sizeof(decltype(handle)), 1, 0, &handle);
 }
 void RenderContextOpenGL::SetGlobalCubeMap(const std::string& name, const TextureOpenGL& cubemap) {
   auto handle = cubemap.GetHandle();
-  SetGlobalUniform(name, sizeof(decltype(handle)), 1, &handle);
+  SetGlobalUniform(name, sizeof(decltype(handle)), 1, 0, &handle);
 }
-void RenderContextOpenGL::SetGlobalFloatArray(const std::string& name, const float* value, int length) { SetGlobalUniform(name, sizeof(float), length, value); }
-void RenderContextOpenGL::SetGlobalIntArray(const std::string& name, const int* value, int length) { SetGlobalUniform(name, sizeof(int), length, value); }
-void RenderContextOpenGL::SetGlobalMat4Array(const std::string& name, const Matrix4f* value, int length) { SetGlobalUniform(name, sizeof(Matrix4f), length, value); }
-void RenderContextOpenGL::SetGlobalVec3Array(const std::string& name, const Vector3f* value, int length) { SetGlobalUniform(name, sizeof(Vector3f), length, value); }
-void RenderContextOpenGL::SetGlobalTex2dArray(const std::string& name, const GLuint* tex2d, int length) { SetGlobalUniform(name, sizeof(GLuint), length, tex2d); }
-void RenderContextOpenGL::SetGlobalCubeMapArray(const std::string& name, const GLuint* cubemap, int length) { SetGlobalUniform(name, sizeof(GLuint), length, cubemap); }
+void RenderContextOpenGL::SetGlobalFloatArray(const std::string& name, const void* value, int length) { SetGlobalUniform(name, sizeof(float), length, 4, value); }
+void RenderContextOpenGL::SetGlobalIntArray(const std::string& name, const void* value, int length) { SetGlobalUniform(name, sizeof(int), length, 4, value); }
+void RenderContextOpenGL::SetGlobalMat4Array(const std::string& name, const void* value, int length) { SetGlobalUniform(name, sizeof(Matrix4f), length, 64, value); }
+void RenderContextOpenGL::SetGlobalVec3Array(const std::string& name, const void* value, int length) { SetGlobalUniform(name, sizeof(Vector3f), length, 16, value); }
+void RenderContextOpenGL::SetGlobalTex2dArray(const std::string& name, const void* tex2d, int length) { SetGlobalUniform(name, sizeof(GLuint), length, 4, tex2d); }
+void RenderContextOpenGL::SetGlobalCubeMapArray(const std::string& name, const void* cubemap, int length) { SetGlobalUniform(name, sizeof(GLuint), length, 4, cubemap); }
 
 void RenderContextOpenGL::CheckInit() const {
 #if !defined(NDEBUG)
@@ -629,6 +665,14 @@ std::vector<VertexPositionNormalTexCoord> GenVboDataPNT(const std::vector<Vector
     pnt[i] = {p, n, t};
   }
   return pnt;
+}
+
+ShaderAttributeLayout POSITION0() {
+  return ShaderAttributeLayout{"a_Pos", SemanticType::Vertex, 0};
+}
+
+ShaderAttributeLayout NORMAL0() {
+  return ShaderAttributeLayout{"a_Normal", SemanticType::Normal, 0};
 }
 
 }  // namespace Hikari

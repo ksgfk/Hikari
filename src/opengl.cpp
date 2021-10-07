@@ -435,11 +435,11 @@ ShaderAttributeLayout::ShaderAttributeLayout(const std::string& name,
 }
 
 bool ShaderUniformBlock::Member::operator==(const ShaderUniformBlock::Member& o) const {
-  return Name == o.Name && Location == o.Location && Type == o.Type && Length == o.Length && Offset == o.Offset;
+  return Name == o.Name && Location == o.Location && Type == o.Type && Length == o.Length && Offset == o.Offset && Align == o.Align;
 }
 
 bool ShaderUniformBlock::Member::operator!=(const ShaderUniformBlock::Member& o) const {
-  return Name != o.Name || Location != o.Location || Type != o.Type || Length != o.Length || Offset != o.Offset;
+  return Name != o.Name || Location != o.Location || Type != o.Type || Length != o.Length || Offset != o.Offset || Align != o.Align;
 }
 
 bool ShaderUniformBlock::operator==(const ShaderUniformBlock& o) const {
@@ -549,7 +549,8 @@ std::optional<const ShaderAttribute*> ProgramOpenGL::GetAttribute(AttributeSeman
 int ProgramOpenGL::GetBindingPoint(AttributeSemantic semantic) const {
   auto iter = _semanticToAttrib.find(semantic);
   if (iter == _semanticToAttrib.end()) {
-    throw OpenGLException("can't find semantic");
+    //throw OpenGLException("can't find semantic");
+    return -1;
   } else {
     return _attribs[iter->second].Location;
   }
@@ -675,7 +676,12 @@ void ProgramOpenGL::SubmitUniform(GLuint prog, GLint location, ParamType type, G
         break;
       }
       case ParamType::Float32Vec3: {
-        HIKARI_CHECK_GL(glUniform3fv(location, count, static_cast<const GLfloat*>(value)));
+        auto v = static_cast<const GLfloat*>(value);
+        if (count == 1) {
+          HIKARI_CHECK_GL(glUniform3f(location, v[0], v[1], v[2]));
+        } else {
+          HIKARI_CHECK_GL(glUniform3fv(location, count, static_cast<const GLfloat*>(value)));
+        }
         break;
       }
       case ParamType::Float32Vec4: {
@@ -864,7 +870,7 @@ std::vector<ShaderAttribute> ProgramOpenGL::ReflectActiveAttrib(GLuint prog) {
     ShaderAttribute desc;
     desc.Location = location;
     desc.Length = size;
-    desc.Name = std::string(attrName.get(), nameSize);
+    desc.Name = std::string(attrName.get());
     desc.Type = MapType(type);
     desc.Semantic = AttributeSemantic(SemanticType::Unknown, 0);
     assert(desc.Type != ParamType::Unknown);
@@ -896,8 +902,12 @@ std::vector<ShaderUniform> ProgramOpenGL::ReflectActiveUniform(GLuint prog) {
     ShaderUniform desc;
     desc.Location = index;
     desc.Length = size;
-    desc.Name = std::string(uniName.get(), nameSize);
+    desc.Name = std::string(uniName.get());
     desc.Type = MapType(type);
+    if (desc.Length > 1) {  //这个uniform是数组，要把末尾的[0]去掉
+      auto pos = desc.Name.find("[0]");
+      desc.Name.replace(pos, 3, "");
+    }
     if (desc.Type == ParamType::Unknown) {
       throw OpenGLException("unknown Type");
     }
@@ -941,13 +951,26 @@ std::vector<ShaderUniformBlock> ProgramOpenGL::ReflectActiveBlock(GLuint prog) {
     for (int j = 0; j < uniCnt; j++) {
       auto memName = std::make_unique<char[]>(nameLens[j]);
       HIKARI_CHECK_GL(glGetActiveUniformName(id, indices[j], nameLens[j], nullptr, memName.get()));
-      members[j].Name = std::string(memName.get(), nameLens[j]);
+      members[j].Name = std::string(memName.get());
       members[j].Location = indices[j];
       members[j].Type = MapType(types[j]);
       members[j].Length = sizes[j];
       members[j].Offset = offsets[j];
+      if (members[j].Length > 1) {  //这个uniform是数组，要把末尾的[0]去掉
+        auto pos = members[j].Name.find("[0]");
+        members[j].Name.replace(pos, 3, "");
+      }
     }
-
+    std::sort(members.begin(), members.end(), [](const auto& l, const auto& r) { return l.Offset < r.Offset; });
+    for (size_t j = 0; j < uniCnt; j++) {  //是数组，计算每个元素字节对齐
+      if (members[j].Length > 1) {
+        if (j + 1 == uniCnt) {
+          members[j].Align = (dataSize - members[j].Offset) / members[j].Length;
+        } else {
+          members[j].Align = (members[j + 1].Offset - members[j].Offset) / members[j].Length;
+        }
+      }
+    }
     ShaderUniformBlock block;
     block.Name = std::string(name.get());
     block.Index = index;

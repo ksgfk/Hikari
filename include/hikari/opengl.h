@@ -275,8 +275,18 @@ struct ShaderUniformBlock {
     std::string Name;
     int Location = -1;
     ParamType Type = ParamType::Unknown;
+    /**
+     * @brief 如果大于1是数组
+    */
     int Length = 0;
+    /**
+     * @brief 在uniform block中，字节偏移量
+    */
     int Offset = 0;
+    /**
+     * @brief 如果是数组就表示两个元素间的距离，否则为0
+    */
+    int Align = 0;
     bool operator==(const Member& o) const;
     bool operator!=(const Member& o) const;
   };

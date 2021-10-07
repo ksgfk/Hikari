@@ -4,10 +4,17 @@
 #include <filesystem>
 #include <vector>
 #include <memory>
+#include <stdexcept>
 
 #include <hikari/mathematics.h>
 
 namespace Hikari {
+class AssetLoadException : public std::runtime_error {
+ public:
+  explicit AssetLoadException(const std::string& msg) noexcept : std::runtime_error(msg.c_str()) {}
+  explicit AssetLoadException(const char* msg) noexcept : std::runtime_error(msg) {}
+};
+
 /**
   * @brief 资源基类
   */
@@ -15,7 +22,7 @@ class Asset : public std::enable_shared_from_this<Asset> {
  public:
   Asset() noexcept;
   Asset(const Asset&) = delete;
-  virtual ~Asset() = 0;
+  virtual ~Asset() noexcept = 0;
   /**
      * @brief 资源索引名字
     */
@@ -42,11 +49,11 @@ class ImmutableBitmap : public Asset {
     * @param path 路径
     * @param isFilpY 是否颠倒Y轴
     */
-  ImmutableBitmap(const std::string& name, const std::filesystem::path& path, bool isFilpY) noexcept;
+  ImmutableBitmap(const std::string& name, const std::filesystem::path& path, bool isFilpY);
   ImmutableBitmap(const ImmutableBitmap&) = delete;
   ImmutableBitmap(ImmutableBitmap&&) noexcept;
   ImmutableBitmap& operator=(ImmutableBitmap&&) noexcept;
-  ~ImmutableBitmap() override;
+  ~ImmutableBitmap() noexcept override;
   const std::string& GetName() const override;
   bool IsValid() const override;
   void Release() override;
@@ -80,7 +87,7 @@ class ImmutableModel : public Asset {
     * @param name 资源索引名字
     * @param path 路径
     */
-  ImmutableModel(const std::string& name, const std::filesystem::path& path) noexcept;
+  ImmutableModel(const std::string& name, const std::filesystem::path& path);
   ImmutableModel(const std::string& name,
                  std::vector<Vector3f>&& pos,
                  std::vector<Vector3f>&& nor,
@@ -89,7 +96,7 @@ class ImmutableModel : public Asset {
   ImmutableModel(const ImmutableModel&) = delete;
   ImmutableModel(ImmutableModel&&) noexcept;
   ImmutableModel& operator=(ImmutableModel&&) noexcept;
-  ~ImmutableModel() override;
+  ~ImmutableModel() noexcept override;
   const std::string& GetName() const override;
   bool IsValid() const override;
   void Release() override;
@@ -120,4 +127,21 @@ class ImmutableModel : public Asset {
   std::vector<size_t> _indices;
   std::string _name;
 };
+
+class ImmutableText : public Asset {
+ public:
+  ImmutableText() noexcept;
+  ImmutableText(const std::string& name, const std::filesystem::path& path);
+  ~ImmutableText() noexcept override;
+  const std::string& GetName() const override;
+  bool IsValid() const override;
+  void Release() override;
+
+  const std::string& GetText() const;
+
+ private:
+  std::string _text;
+  std::string _name;
+};
+
 }  // namespace Hikari

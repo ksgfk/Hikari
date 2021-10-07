@@ -119,18 +119,18 @@ class RenderContextOpenGL {
   const VertexArrayOpenGL& GetVertexArray(const std::shared_ptr<ProgramOpenGL>&) const;
 
   /**
-   * @brief 预处理shader。应用宏替换，处理include指令
+   * @brief 预处理shader。应用宏替换，处理include指令，初步验证语法正确性
    * @param type 阶段（shader stage）
    * @param source glsl源码
-   * @param res 编译后的glsl源码，如果编译失败则返回错误信息
-   * @return 是否编译成功
+   * @param res 预处理后glsl源码，如果处理失败则不返回任何数据
+   * @return 是否预处理成功
   */
-  bool ProprocessShader(ShaderType type, const std::string& source, std::string& res);
+  bool PreprocessShader(ShaderType type, const std::string& source, std::string& res);
   /**
    * @brief 完整编译shader，输入的glsl必须可以编译为SPIR-V
    * @param type 阶段（shader stage）
    * @param source glsl源码
-   * @param res 编译后的glsl源码，如果编译失败则返回错误信息
+   * @param res 编译后的glsl源码，如果处理失败则不返回任何数据
    * @return 是否编译成功
   */
   bool ProcessShader(ShaderType type, const std::string& source, std::string& res);
@@ -147,21 +147,30 @@ class RenderContextOpenGL {
   void DrawElements(PrimitiveMode, int count, IndexDataType = IndexDataType::UnsignedInt, size_t first = 0) const;
 
   void SubmitGlobalUnifroms() const;
-  void SetGlobalUniformData(const std::string& name, size_t dataSize, int length, const void* data);
-  void SetGlobalUniformData(const GlobalUniform& uniform, size_t dataSize, int length, const void* data);
-  void SetGlobalUniform(const std::string& name, size_t dataSize, int length, const void* data);
+  void SetGlobalUniformData(const std::string& name, size_t dataSize, int length, int align, const void* data);
+  /**
+   * @brief 将uniform block需要的数据传入buffer
+   * @param uniform uniform对象
+   * @param dataSize data指向数据类型的大小
+   * @param length data指向数据长度
+   * @param align 如果数据是数组，表示两元素间的距离
+   * @param data 数据指针
+   * @return 
+  */
+  void SetGlobalUniformData(const GlobalUniform& uniform, size_t dataSize, int length, int align, const void* data);
+  void SetGlobalUniform(const std::string& name, size_t dataSize, int length, int align, const void* data);
   void SetGlobalFloat(const std::string& name, float value);
   void SetGlobalInt(const std::string& name, int value);
   void SetGlobalMat4(const std::string& name, const Matrix4f& value);
   void SetGlobalVec3(const std::string& name, const Vector3f& value);
   void SetGlobalTex2d(const std::string& name, const TextureOpenGL& tex2d);
   void SetGlobalCubeMap(const std::string& name, const TextureOpenGL& cubemap);
-  void SetGlobalFloatArray(const std::string& name, const float* value, int length);
-  void SetGlobalIntArray(const std::string& name, const int* value, int length);
-  void SetGlobalMat4Array(const std::string& name, const Matrix4f* value, int length);
-  void SetGlobalVec3Array(const std::string& name, const Vector3f* value, int length);
-  void SetGlobalTex2dArray(const std::string& name, const GLuint* tex2d, int length);
-  void SetGlobalCubeMapArray(const std::string& name, const GLuint* cubemap, int length);
+  void SetGlobalFloatArray(const std::string& name, const void* value, int length);
+  void SetGlobalIntArray(const std::string& name, const void* value, int length);
+  void SetGlobalMat4Array(const std::string& name, const void* value, int length);
+  void SetGlobalVec3Array(const std::string& name, const void* value, int length);
+  void SetGlobalTex2dArray(const std::string& name, const void* tex2d, int length);
+  void SetGlobalCubeMapArray(const std::string& name, const void* cubemap, int length);
 
  private:
   void CheckInit() const;
@@ -175,6 +184,21 @@ class RenderContextOpenGL {
   std::unordered_map<std::string, GlobalUniform> _globalUniforms;
   bool _isValid{};
 };
+
+//一些shader library包含的uniform名
+constexpr const char* UNIFORM_MODEL_MATRIX = "u_ObjectToWorld";
+constexpr const char* UNIFORM_MODEL_MATRIX_INV = "u_WorldToObject";
+constexpr const char* UNIFORM_VIEW_MATRIX = "u_MatrixV";
+constexpr const char* UNIFORM_VIEW_MATRIX_INV = "u_MatrixInvV";
+constexpr const char* UNIFORM_PROJ_MATRIX = "u_MatrixP";
+constexpr const char* UNIFORM_VP_MATRIX = "u_MatrixVP";
+constexpr const char* UNIFORM_CAMERA_POS = "u_CameraPos";
+constexpr const char* UNIFORM_LIGHT_DIR_RAD = "u_LightRadianceDir";
+constexpr const char* UNIFORM_LIGHT_DIR_DIR = "u_LightDirectionDir";
+constexpr const char* UNIFORM_LIGHT_DIR_CNT = "u_LightDirCount";
+constexpr const char* UNIFORM_LIGHT_POINT_RAD = "u_LightRadiancePoint";
+constexpr const char* UNIFORM_LIGHT_POINT_DIR = "u_LightPositionPoint";
+constexpr const char* UNIFORM_LIGHT_POINT_CNT = "u_LightPointCount";
 
 //在buffer中排列：PNTPNTPNT
 struct VertexPositionNormalTexCoord {
@@ -199,5 +223,7 @@ constexpr VertexBufferLayout GetVertexLayoutNormalPNT() {
 constexpr VertexBufferLayout GetVertexLayoutTexCoordPNT(int index) {
   return VertexBufferLayout({SemanticType::TexCoord, index}, SizePNT(), offsetof(VertexPositionNormalTexCoord, TexCoord));
 }
+ShaderAttributeLayout POSITION0();
+ShaderAttributeLayout NORMAL0();
 
 }  // namespace Hikari

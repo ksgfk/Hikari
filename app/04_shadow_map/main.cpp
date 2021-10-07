@@ -241,7 +241,7 @@ class BlinnPhongPass : public RenderPass {
 
 int main(int argc, char** argv) {
   auto& app = Application::GetInstance();
-  app.GetArgs(argc, argv);
+  app.ParseArgs(argc, argv);
   app.SetWindowCreateInfo({"Hikari Shadow Map"});
   app.SetRenderContextCreateInfo({3, 3});
   app.CreateCamera<PerspectiveCamera>();

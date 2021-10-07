@@ -19,9 +19,9 @@ in vec3 aNormal;
 out vec3 vPos;
 out vec3 vNormal;
 
-mat4 projection;
-mat4 view;
-mat4 model;
+uniform mat4 projection;
+uniform mat4 view;
+uniform mat4 model;
 
 void main() {
   vPos = vec3(model * vec4(aPos, 1.0));
@@ -31,11 +31,12 @@ void main() {
 
 const char* ts = R"(
 uniform TEST {
-  uniform vec3 a;
-  uniform vec3 b;
-  uniform mat4 d;
-  uniform mat4 e;
-};)";
+  vec3 a;
+  vec3 b;
+  mat4 d;
+  mat4 e;
+};
+)";
 
 int main() {
   RenderContextOpenGL ctx;
@@ -46,9 +47,11 @@ int main() {
   testFile.close();
 
   std::string res;
-  bool succ = ctx.ProprocessShader(ShaderType::Vertex, s, res);
+  bool succ = ctx.PreprocessShader(ShaderType::Vertex, s, res);
   std::cout << "is success:" << succ << std::endl;
-  std::cout << res << std::endl;
+  if (succ) {
+    std::cout << "result:\n" << res << std::endl;
+  }
 
   return 0;
 }

@@ -37,7 +37,7 @@ struct Transform {
 class GameObject {
  public:
   GameObject() noexcept;
-  GameObject(const std::string& name);
+  GameObject(const std::string& name) noexcept;
   virtual ~GameObject() noexcept;
 
   virtual void OnStart();
@@ -65,9 +65,53 @@ class MainCamera : public GameObject {
   ~MainCamera() override = default;
   void OnUpdate() override;
 
+  void SetGlobalCameraData();
+  void SetCameraData(const ProgramOpenGL& prog);
+
   bool CanOrbitCtrl{};
   std::unique_ptr<Camera> Camera;
   OrbitControls Orbit{};
+};
+
+enum class LightType {
+  Directional,
+  Point
+};
+
+class Light : public GameObject {
+ public:
+  Light(const std::string& name) noexcept;
+  Light(const std::string& name, LightType type, const Vector3f& color, float intensity, const Vector3f& dir) noexcept;
+  ~Light() noexcept override;
+
+  LightType Type{LightType::Directional};
+  Vector3f Color{1, 1, 1};
+  float Intensity{1};
+  Vector3f Direction{0, -1, 0};
+};
+
+class LightCollection {  //TODO:编译shader时把MAX_LIGHT_COUNT宏传进去
+ public:
+  struct alignas(16) Vec3Align16 {
+    Vector3f Data;
+  };
+
+  LightCollection() noexcept;
+  LightCollection(int maxLight) noexcept;
+
+  bool AddLight(const std::shared_ptr<Light>& light);
+  void CollectData();
+  void SubmitData(RenderContextOpenGL& ctx) const;
+  void Clear();
+
+ private:
+  int _maxLight = 8;
+  std::vector<std::shared_ptr<Light>> _dir;
+  std::vector<std::shared_ptr<Light>> _point;
+  std::vector<Vec3Align16> _dirRadianceData;
+  std::vector<Vec3Align16> _dirDirectionData;
+  std::vector<Vec3Align16> _pointRadianceData;
+  std::vector<Vec3Align16> _pointDirectionData;
 };
 
 class IRenderPass {
@@ -77,6 +121,8 @@ class IRenderPass {
   virtual int GetPriority() const = 0;
   virtual void OnStart() = 0;
   virtual void OnUpdate() = 0;
+  virtual ProgramOpenGL& GetPipelineProgram() = 0;
+  virtual bool HasPipelineProgram() = 0;
 };
 
 class RenderPass : public IRenderPass {
@@ -88,6 +134,8 @@ class RenderPass : public IRenderPass {
   int GetPriority() const override;
   void OnStart() override;
   void OnUpdate() override;
+  ProgramOpenGL& GetPipelineProgram() override;
+  bool HasPipelineProgram() override;
 
   Application& GetApp();
   std::shared_ptr<ProgramOpenGL>& GetProgram();
@@ -98,8 +146,11 @@ class RenderPass : public IRenderPass {
   std::unique_ptr<Camera>& GetCamera();
   void SetProgram(const std::shared_ptr<ProgramOpenGL>& prog);
   void SetProgram(const std::string& vs, const std::string& fs, const ShaderAttributeLayouts& layouts);
+  void LoadProgram(const std::filesystem::path& vsPath, const std::filesystem::path& fsPath,
+                   const ShaderAttributeLayouts& layouts);
   PipelineState& GetPipelineState();
   void SetPipelineState(const PipelineState& state);
+
   void ActivePipelineConfig();
   void ActiveProgram();
   void SetVertexBuffer(const BufferOpenGL& vbo, const VertexBufferLayout& layout);
@@ -107,6 +158,7 @@ class RenderPass : public IRenderPass {
   void SetVertexBuffer(const std::shared_ptr<BufferOpenGL>& vbo, const VertexBufferLayout& layout);
   void SetIndexBuffer(const std::shared_ptr<BufferOpenGL>& ibo);
   uint32_t BindTexture(const TextureOpenGL& texture);
+  void SetModelMatrix(const GameObject& go);
   void Draw(int vertexCount, int vertexStart);
   void DrawIndexed(int indexCount, int indexStart);
 
@@ -124,6 +176,7 @@ class AppRuntimeException : public std::runtime_error {
   explicit AppRuntimeException(const char* msg) noexcept : std::runtime_error(msg) {}
 };
 
+//上传light数据
 class Application {
  public:
   Application(const Application&) = delete;
@@ -133,6 +186,7 @@ class Application {
   void SetRenderContextCreateInfo(const ContextOpenGLDescription& info);
   void Awake();
   void Run();
+  void Destroy();
 
   NativeWindow& GetWindow();
   RenderContextOpenGL& GetContext();
@@ -149,10 +203,11 @@ class Application {
   void AddPass(const std::shared_ptr<IRenderPass>& pass);
   void SetSharedObject(const std::string& name, std::any&& obj);
   void AddGameObject(const std::shared_ptr<GameObject>& gameObject);
+  void AddLight(const std::shared_ptr<Light>& light);
   void SetCamera(std::unique_ptr<Camera>&& camera);
   void SetAssetPath(const std::filesystem::path&);
   void SetShaderLibPath(const std::filesystem::path&);
-  void GetArgs(int argc, char** argv);
+  void ParseArgs(int argc, char** argv);
 
   template <class PassType, class... Args>
   void CreatePass(Args&&... args) {
@@ -163,6 +218,11 @@ class Application {
   void Instantiate(Args&&... args) {
     static_assert(std::is_base_of<GameObject, GameObjectType>::value, "GameObjectType must be a subclass of GameObject");
     AddGameObject(std::make_shared<GameObjectType>(std::forward<Args>(args)...));
+  }
+  template <class LightType, class... Args>
+  void CreateLight(Args&&... args) {
+    static_assert(std::is_base_of<Light, LightType>::value, "LightType must be a subclass of Light");
+    AddLight(std::make_shared<LightType>(std::forward<Args>(args)...));
   }
   template <class CameraType, class... Args>
   void CreateCamera(Args&&... args) {
@@ -196,6 +256,7 @@ class Application {
   Input _input;
   std::vector<std::shared_ptr<GameObject>> _gameObjects;
   std::unordered_map<std::string, std::shared_ptr<GameObject>> _gameObjectNameDict;
+  LightCollection _lights;
   std::vector<std::shared_ptr<IRenderPass>> _renderPasses;
   std::unordered_map<std::string, std::shared_ptr<IRenderPass>> _renderPassNameDict;
   std::unordered_map<std::string, std::any> _shared;

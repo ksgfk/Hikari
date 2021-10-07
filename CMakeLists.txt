@@ -14,6 +14,27 @@ option(HIKARI_BUILD_SHARED "Build Hikari as a shared library?" ${HIKARI_BUILD_SH
 set(HIKARI_UNIT_TEST_DEFAULT ON)
 option(HIKARI_UNIT_TEST "Build Hikari unit test?" ${HIKARI_UNIT_TEST_DEFAULT})
 
+# 将传入的所有文件复制到目标，FilesName是可变参数
+function(CopyFilesToOutDirOnPostBuild TargetCmd FilesName)
+  set(THIS_IDX 1)
+  while(THIS_IDX LESS ${ARGC})
+	list(APPEND THIS_FILES_LIST "${CMAKE_CURRENT_SOURCE_DIR}/${ARGV${THIS_IDX}}")
+    math(EXPR THIS_IDX "${THIS_IDX} + 1")
+  endwhile()
+  add_custom_command(TARGET ${TargetCmd} POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different 
+	${THIS_FILES_LIST}
+	$<TARGET_FILE_DIR:${TargetCmd}>)
+endfunction()
+
+# 将文件复制到目标
+function(CopyFileToOutDirOnPostBuild TargetCmd FilesName)
+add_custom_command(TARGET ${TargetCmd} POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different 
+    ${CMAKE_CURRENT_SOURCE_DIR}/${FileName}
+    $<TARGET_FILE_DIR:${TargetCmd}>)
+endfunction()
+
 project("Hikari")
 
 if (HIKARI_BUILD_SHARED)#HIKARI_LIBRARY_TYPE字段，表示公共库类型

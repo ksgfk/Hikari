@@ -14,9 +14,9 @@ C++17标准
 
 * [tinyobjloader](https://github.com/tinyobjloader/tinyobjloader) 写一个完备的.obj加载有亿点麻烦（
 
-* [glslang](https://github.com/KhronosGroup/glslang) 用来预处理include指令，没其它用
+* [glslang](https://github.com/KhronosGroup/glslang) 用来预处理include指令，验证glsl语法
 
-* [SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross) 将glslang生成的spir-v字节码编译回glsl
+* [SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross) 将glslang生成的spir-v字节码编译回glsl（暂时用不到
 
 ## Structure 结构
 
@@ -40,14 +40,22 @@ Linux Ubuntu下，Clang10编译运行通过，GCC没试（懒
 
 如果使用在linux使用clang编译还需要安装`libc++-dev`和`libc++abi-dev`
 
-**注意：**有些app必须输入资源文件的根目录，例如`app.exe -A assetPath`。路径有误的话，可能会直接crash（
+**注意：** 有些app必须输入资源文件的根目录，例如`app.exe -A assetPath`。路径有误的话，可能会直接crash（
 
-src/application.cpp文件里，`GetArgs`函数里列出了所有支持的命令行参数
+src/application.cpp文件里，`ParseArgs`函数里列出了所有支持的命令行参数
 
 ## Show 结果展示
+### 5.Multi Light
+
+<img src="show/5-multi_light.png" alt="5-multi_light.png" width="50%">
+
+**注意：** 需要加载资源
+
+非常简单的多光源，每次打开程序光源方向、颜色都不一样~光源还会自己动
+
 ### 4.Shadow Map
 
-<img src="show/4-shadow_map.png" alt="4-shadow_map.png">
+<img src="show/4-shadow_map.png" alt="4-shadow_map.png" width="50%">
 
 **注意：** 需要加载资源
 
@@ -55,13 +63,13 @@ src/application.cpp文件里，`GetArgs`函数里列出了所有支持的命令�
 
 ### 3.Blinn Phong
 
-<img src="show/3-blinn.png" alt="3-blinn.png">
+<img src="show/3-blinn.png" alt="3-blinn.png" width="50%">
 
 directional light，超级简单的blinn phong高光模型。场景同样可以查看四周（操作看2.Sky box
 
 ### 2.Sky box
 
-<img src="show/2-skybox.png" alt="2-skybox.png">
+<img src="show/2-skybox.png" alt="2-skybox.png" width="50%">
 
 **注意：** 需要加载资源
 
@@ -69,7 +77,7 @@ directional light，超级简单的blinn phong高光模型。场景同样可以�
 
 ### 1.Simple Triangle
 
-<img src="show/1-triangle.png" alt="1-triangle.png">
+<img src="show/1-triangle.png" alt="1-triangle.png" width="50%">
 
 （triangle...?这tm不是矩形吗
 

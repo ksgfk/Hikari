@@ -16,8 +16,8 @@ static void __MessageCallbackOGL(GLenum source,
                                  GLsizei length,
                                  GLchar const* message,
                                  void const* user_param) {
-  auto const src_str = [source]() {
-    switch (source) {
+  auto const src_str = [](GLenum src) {
+    switch (src) {
       case GL_DEBUG_SOURCE_API:
         return "API";
       case GL_DEBUG_SOURCE_WINDOW_SYSTEM:
@@ -33,9 +33,9 @@ static void __MessageCallbackOGL(GLenum source,
       default:
         return "Unknown Source";
     }
-  }();
-  auto const type_str = [type]() {
-    switch (type) {
+  }(source);
+  auto const type_str = [](GLenum tp) {
+    switch (tp) {
       case GL_DEBUG_TYPE_ERROR:
         return "Error";
       case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
@@ -53,9 +53,9 @@ static void __MessageCallbackOGL(GLenum source,
       default:
         return "Unknown Type";
     }
-  }();
-  auto const severity_str = [severity]() {
-    switch (severity) {
+  }(type);
+  auto const severity_str = [](GLenum s) {
+    switch (s) {
       case GL_DEBUG_SEVERITY_NOTIFICATION:
         return "Notify";
       case GL_DEBUG_SEVERITY_LOW:
@@ -67,7 +67,11 @@ static void __MessageCallbackOGL(GLenum source,
       default:
         return "Unknown Severity";
     }
-  }();
+  }(severity);
+  //去掉debug group的信息（
+  if (source == GL_DEBUG_SOURCE_APPLICATION && severity == GL_DEBUG_SEVERITY_NOTIFICATION) {
+    return;
+  }
   std::cout << "[" << src_str << "," << type_str << "," << severity_str << "," << id << "]->" << message << std::endl;
 }
 
@@ -93,9 +97,7 @@ Matrix4f Transform::ObjectToWorldMatrix() const {
 
 GameObject::GameObject() noexcept = default;
 
-GameObject::GameObject(const std::string& name) : GameObject() {
-  _name = name;
-}
+GameObject::GameObject(const std::string& name) noexcept : GameObject() { _name = name; }
 
 GameObject::~GameObject() noexcept = default;
 
@@ -156,7 +158,105 @@ void MainCamera::OnUpdate() {
   }
   if (Camera) {
     Camera->SetAspect(width, height);
+    SetGlobalCameraData();
   }
+}
+
+void MainCamera::SetGlobalCameraData() {
+  auto& ctx = GetContext();
+  auto v = Camera->GetViewMatrix();
+  auto p = Camera->GetProjectionMatrix();
+  Matrix4f invV;
+  auto hasInv = Invert(v, invV);
+  ctx.SetGlobalMat4(UNIFORM_VIEW_MATRIX, v);
+  ctx.SetGlobalMat4(UNIFORM_PROJ_MATRIX, p);
+  ctx.SetGlobalMat4(UNIFORM_VP_MATRIX, (v * p));
+  if (hasInv) {
+    ctx.SetGlobalMat4(UNIFORM_VIEW_MATRIX_INV, invV);
+  } else {
+    ctx.SetGlobalMat4(UNIFORM_VIEW_MATRIX_INV, Matrix4f::Identity());
+  }
+}
+
+void MainCamera::SetCameraData(const ProgramOpenGL& prog) {
+  prog.Bind();
+  prog.UniformVec3(UNIFORM_CAMERA_POS, Camera->GetPosition().GetAddress());
+}
+
+Light::Light(const std::string& name) noexcept : GameObject(name) {}
+
+Light::Light(const std::string& name,
+             LightType type,
+             const Vector3f& color,
+             float intensity,
+             const Vector3f& dir) noexcept
+    : GameObject(name), Type(type), Color(color), Intensity(intensity), Direction(dir) {}
+
+Light::~Light() noexcept = default;
+
+LightCollection::LightCollection() noexcept = default;
+
+LightCollection::LightCollection(int maxLight) noexcept {
+  _maxLight = maxLight;
+  _dir.reserve(maxLight);
+  _point.reserve(maxLight);
+  _dirRadianceData.reserve(maxLight);
+  _dirDirectionData.reserve(maxLight);
+  _pointRadianceData.reserve(maxLight);
+  _pointDirectionData.reserve(maxLight);
+}
+
+bool LightCollection::AddLight(const std::shared_ptr<Light>& light) {
+  switch (light->Type) {
+    case LightType::Directional:
+      if (_dir.size() >= _maxLight) {
+        return false;
+      }
+      _dir.emplace_back(light);
+      _dirRadianceData.emplace_back(Vec3Align16{});
+      _dirDirectionData.emplace_back(Vec3Align16{});
+      break;
+    case LightType::Point:
+      if (_point.size() >= _maxLight) {
+        return false;
+      }
+      _point.emplace_back(light);
+      _pointRadianceData.emplace_back(Vec3Align16{});
+      _pointDirectionData.emplace_back(Vec3Align16{});
+      break;
+    default:
+      throw AppRuntimeException("unknown light type");
+  }
+  return true;
+}
+
+void LightCollection::CollectData() {
+  for (size_t i = 0; i < _dir.size(); i++) {
+    _dirRadianceData[i] = {_dir[i]->Color * Vector3f(_dir[i]->Intensity)};
+    _dirDirectionData[i] = {Normalize(_dir[i]->Direction)};
+  }
+  for (size_t i = 0; i < _point.size(); i++) {
+    _pointRadianceData[i] = {_point[i]->Color * Vector3f(_point[i]->Intensity)};
+    _pointDirectionData[i] = {Normalize(_point[i]->Direction)};
+  }
+}
+
+void LightCollection::SubmitData(RenderContextOpenGL& ctx) const {
+  ctx.SetGlobalVec3Array(UNIFORM_LIGHT_DIR_RAD, _dirRadianceData.data(), int(_dirRadianceData.size()));
+  ctx.SetGlobalVec3Array(UNIFORM_LIGHT_DIR_DIR, _dirDirectionData.data(), int(_dirDirectionData.size()));
+  ctx.SetGlobalVec3Array(UNIFORM_LIGHT_POINT_RAD, _pointRadianceData.data(), int(_pointRadianceData.size()));
+  ctx.SetGlobalVec3Array(UNIFORM_LIGHT_POINT_DIR, _pointDirectionData.data(), int(_pointDirectionData.size()));
+  ctx.SetGlobalInt(UNIFORM_LIGHT_DIR_CNT, int(_dir.size()));
+  ctx.SetGlobalInt(UNIFORM_LIGHT_POINT_CNT, int(_point.size()));
+}
+
+void LightCollection::Clear() {
+  _dir.clear();
+  _point.clear();
+  _dirRadianceData.clear();
+  _dirDirectionData.clear();
+  _pointRadianceData.clear();
+  _pointDirectionData.clear();
 }
 
 IRenderPass::~IRenderPass() noexcept = default;
@@ -174,6 +274,10 @@ int RenderPass::GetPriority() const { return _priority; }
 void RenderPass::OnStart() {}
 
 void RenderPass::OnUpdate() {}
+
+ProgramOpenGL& RenderPass::GetPipelineProgram() { return *_prog; }
+
+bool RenderPass::HasPipelineProgram() { return _prog != nullptr; }
 
 Application& RenderPass::GetApp() { return Application::GetInstance(); }
 
@@ -197,6 +301,24 @@ void RenderPass::SetProgram(const std::shared_ptr<ProgramOpenGL>& prog) { _prog 
 
 void RenderPass::SetProgram(const std::string& vs, const std::string& fs, const ShaderAttributeLayouts& layouts) {
   _prog = GetApp().GetContext().CreateShaderProgram(vs, fs, layouts);
+}
+
+void RenderPass::LoadProgram(const std::filesystem::path& vsPath, const std::filesystem::path& fsPath,
+                             const ShaderAttributeLayouts& layouts) {
+  ImmutableText vs("vs", vsPath);
+  ImmutableText fs("fs", fsPath);
+  auto& ctx = GetContext();
+  std::string resVs;
+  if (!ctx.PreprocessShader(ShaderType::Vertex, vs.GetText(), resVs)) {
+    std::cerr << "preprocess " << vsPath << " error" << std::endl;
+    throw RenderContextException("can't preprocess vertex shader");
+  }
+  std::string resFs;
+  if (!ctx.PreprocessShader(ShaderType::Fragment, fs.GetText(), resFs)) {
+    std::cerr << "preprocess " << fsPath << " error" << std::endl;
+    throw RenderContextException("can't preprocess fragment shader");
+  }
+  _prog = ctx.CreateShaderProgram(resVs, resFs, layouts);
 }
 
 PipelineState& RenderPass::GetPipelineState() { return _pipeState; }
@@ -224,6 +346,9 @@ void RenderPass::ActiveProgram() {
 
 void RenderPass::SetVertexBuffer(const BufferOpenGL& vbo, const VertexBufferLayout& layout) {
   auto bp = _prog->GetBindingPoint(layout.Semantic);
+  if (bp < 0) {
+    return;
+  }
   const auto& vao = GetApp().GetContext().GetVertexArray(_prog);
   vao.SetVertexBuffer({(GLuint)bp, vbo.GetHandle(), layout.Offset, layout.Stride});
 }
@@ -248,6 +373,18 @@ uint32_t RenderPass::BindTexture(const TextureOpenGL& texture) {
   HIKARI_CHECK_GL(glBindTexture(type, texture.GetHandle()));
   _textureSlot++;
   return slot;
+}
+
+void RenderPass::SetModelMatrix(const GameObject& go) {
+  auto m = go.GetTransform().ObjectToWorldMatrix();
+  Matrix4f invM;
+  auto hasInv = Invert(m, invM);
+  _prog->UniformMat4(UNIFORM_MODEL_MATRIX, m.GetAddress());
+  if (hasInv) {
+    _prog->UniformMat4(UNIFORM_MODEL_MATRIX_INV, invM.GetAddress());
+  } else {
+    _prog->UniformMat4(UNIFORM_MODEL_MATRIX_INV, Matrix4f::Identity().GetAddress());
+  }
 }
 
 void RenderPass::Draw(int vertexCount, int vertexStart) {
@@ -332,17 +469,25 @@ void Application::Awake() {
   for (auto& renderPass : _renderPasses) {
     renderPass->OnStart();
   }
+  if (feature.GetMajorVersion() >= 4 && feature.GetMinorVersion() >= 1) {
+    HIKARI_CHECK_GL(glReleaseShaderCompiler());
+  }
 }
 
 void Application::Run() {
   const auto& feature = FeatureOpenGL::Get();
   while (!_window.ShouldClose()) {
-    _input.Update(_window.GetHandle());
-    for (auto& gameObject : _gameObjects) {
+    _input.Update(_window.GetHandle());      //更新input输入
+    for (auto& gameObject : _gameObjects) {  //更新GameObject
       gameObject->OnUpdate();
     }
-    _context.SubmitGlobalUnifroms();
-    for (auto& renderPass : _renderPasses) {
+    _lights.CollectData();
+    _lights.SubmitData(_context);             //上传灯光
+    _context.SubmitGlobalUnifroms();          //上传所有uniform block块数据
+    for (auto& renderPass : _renderPasses) {  //更新pass
+      if (renderPass->HasPipelineProgram()) {
+        _camera->SetCameraData(renderPass->GetPipelineProgram());  //更新uniform相机数据
+      }
       if (feature.GetMajorVersion() >= 4 && feature.GetMinorVersion() >= 3) {
         HIKARI_CHECK_GL(glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, renderPass->GetName().c_str()));
         renderPass->OnUpdate();
@@ -356,7 +501,12 @@ void Application::Run() {
     UpdateTime();
     std::this_thread::yield();
   }
+  Destroy();
+}
+
+void Application::Destroy() {
   _camera = nullptr;
+  _lights.Clear();
   _gameObjects.clear();
   _renderPasses.clear();
   _context.Destroy();
@@ -378,12 +528,23 @@ void Application::AddPass(const std::shared_ptr<IRenderPass>& pass) {
 }
 
 void Application::AddGameObject(const std::shared_ptr<GameObject>& gameObject) {
+  if (gameObject->GetName().empty()) {
+    throw AppRuntimeException("game object name cannot empty");
+  }
   if (_gameObjectNameDict.find(gameObject->GetName()) != _gameObjectNameDict.end()) {
     throw AppRuntimeException("game object name must be unique");
   }
   auto idx = std::distance(_gameObjects.begin(), _gameObjects.end());
   _gameObjects.emplace_back(gameObject);
   _gameObjectNameDict[gameObject->GetName()] = gameObject;
+}
+
+void Application::AddLight(const std::shared_ptr<Light>& light) {
+  if (!_lights.AddLight(light)) {
+    std::cerr << "max light count" << std::endl;
+  } else {
+    AddGameObject(light);
+  }
 }
 
 void Application::SetCamera(std::unique_ptr<Camera>&& camera) { _camera->Camera = std::move(camera); }
@@ -408,7 +569,7 @@ void Application::SetAssetPath(const std::filesystem::path& root) { _assetRoot =
 
 void Application::SetShaderLibPath(const std::filesystem::path& root) { _shaderLibRoot = root; }
 
-void Application::GetArgs(int argc, char** argv) {
+void Application::ParseArgs(int argc, char** argv) {
   if (argc <= 1) {
     std::cout << "Command-line arguments options:\n"
               << "  -A | --asset    Set asset root path\n"
