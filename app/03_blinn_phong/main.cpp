@@ -74,7 +74,7 @@ class BlinnPhongPass : public RenderPass {
   void OnUpdate() override {
     auto& blinn = GetProgram();
     auto& ctx = GetContext();
-    ctx.SetViewport(0, 0, GetFBWidth(), GetFBHeight());
+    ctx.SetViewport(0, 0, GetFrameBufferWidth(), GetFrameBufferHeight());
     ctx.SetClearColor(0, 0, 0, 0);
     ctx.ClearColorAndDepth();
     ActivePipelineConfig();

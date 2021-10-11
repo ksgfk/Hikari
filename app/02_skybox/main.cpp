@@ -141,7 +141,7 @@ class NormalPass : public RenderPass {
   void OnUpdate() override {
     auto& prog = GetProgram();
     auto& ctx = GetContext();
-    ctx.SetViewport(0, 0, GetFBWidth(), GetFBHeight());
+    ctx.SetViewport(0, 0, GetFrameBufferWidth(), GetFrameBufferHeight());
     ctx.SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     ctx.ClearColorAndDepth();
     ActivePipelineConfig();

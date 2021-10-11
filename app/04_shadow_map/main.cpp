@@ -193,7 +193,7 @@ class BlinnPhongPass : public RenderPass {
     auto& ctx = GetContext();
     auto view = GetCamera()->GetViewMatrix();
     auto proj = GetCamera()->GetProjectionMatrix();
-    ctx.SetViewport(0, 0, GetFBWidth(), GetFBHeight());
+    ctx.SetViewport(0, 0, GetFrameBufferWidth(), GetFrameBufferHeight());
     ctx.SetClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     ctx.ColorMask(true, true, true, true);
     ctx.ClearColorAndDepth();

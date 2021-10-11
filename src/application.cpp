@@ -155,6 +155,9 @@ void MainCamera::OnUpdate() {
                  input.GetMouse(MouseButton::Left),
                  input.GetMouse(MouseButton::Right));
     Orbit.ApplyCamera(Camera.get());
+    auto& trans = GetTransform();
+    trans.Position = Camera->GetPosition();
+    trans.Rotation = Camera->GetSkyboxViewMatrix();
   }
   if (Camera) {
     Camera->SetAspect(width, height);
@@ -291,9 +294,14 @@ Vector2i RenderPass::GetFrameBufferSize() {
   return result;
 }
 
-int RenderPass::GetFBWidth() { return GetFrameBufferSize().X(); }
+int RenderPass::GetFrameBufferWidth() { return GetFrameBufferSize().X(); }
 
-int RenderPass::GetFBHeight() { return GetFrameBufferSize().Y(); }
+int RenderPass::GetFrameBufferHeight() { return GetFrameBufferSize().Y(); }
+
+void RenderPass::SetViewportFullFrameBuffer() {
+  auto size = GetFrameBufferSize();
+  GetContext().SetViewport(0, 0, size.X(), size.Y());
+}
 
 std::unique_ptr<Camera>& RenderPass::GetCamera() { return GetApp().GetCamera().Camera; }
 

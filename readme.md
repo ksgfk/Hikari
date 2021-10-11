@@ -45,6 +45,20 @@ Linux Ubuntu下，Clang10编译运行通过，GCC没试（懒
 src/application.cpp文件里，`ParseArgs`函数里列出了所有支持的命令行参数
 
 ## Show 结果展示
+### 6.PBR Direct Light
+
+<img src="show/6-pbr_direct.png" alt="6-pbr_direct.png" width="50%">
+
+**注意：** 需要加载资源
+
+直接光PBR
+
+microfacet模型，使用Cook-Torrance BRDF，法线分布和几何遮蔽使用GGX近似，fresnel使用Schlick近似（金属和塑料统一近似处理），没有实现多次散射能量补偿（Multiple Scattering Microfacet BRDF），实际上高粗糙度下有能量丢失，颜色是比较暗的
+
+（Tonemapping直接从learn opengl抄的超简单的一个实现）
+
+（最下面那个球是blinn-phong做对比）
+
 ### 5.Multi Light
 
 <img src="show/5-multi_light.png" alt="5-multi_light.png" width="50%">

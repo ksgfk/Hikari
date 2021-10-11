@@ -3,8 +3,8 @@
 
 #include <Macros.glsl>
 
-struct PbrMaterial {
-  vec3 AlbedoMap;
+struct MetallicWorkflowMaterial {
+  vec3 Albedo;
   float Metallic;
   float Roughness;
 };
@@ -36,7 +36,39 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
 vec3 FresnelSchlick(vec3 F0, vec3 V, vec3 H) {
   float theta = dot(V, H);
   theta = clamp(theta, 0.0, 1.0);
-  return F0 +(1.0 - F0) * pow(1.0 - theta, 5.0);
+  return F0 + (1.0 - F0) * pow(1.0 - theta, 5.0);
+}
+
+struct BlinnPhongMaterial {
+  vec3 kd;
+  vec3 ks;
+  float shiness;
+};
+
+/**
+ * norm:法线方向
+ * LiDir:光源方向
+ * LiRad:光源radiance
+ * eyePos:摄像机位置
+ * shadePos:着色点
+ */
+vec3 BlinnPhong(BlinnPhongMaterial blinn, vec3 norm, vec3 LiDir, vec3 LiRad, vec3 eyePos, vec3 shadePos) {
+  vec3 kd = blinn.kd;
+  vec3 ks = blinn.ks;
+  float shin = blinn.shiness;
+
+  vec3 diffuse = vec3(0.0);
+  vec3 specular = vec3(0.0);
+
+  float NdotL = dot(LiDir, norm);
+  diffuse = max(NdotL, 0.0) * LiRad * kd;
+
+  vec3 viewDir = normalize(eyePos - shadePos);
+  vec3 halfDir = normalize(viewDir + LiDir);
+  float spec = max(pow(dot(halfDir, norm), shin), 0);
+  specular = ks * LiRad * spec;
+
+  return diffuse + specular;
 }
 
 #endif

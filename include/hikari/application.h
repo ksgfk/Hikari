@@ -59,6 +59,7 @@ class GameObject {
   Transform _transform;
 };
 
+//嗯...GetTransform()只能用来获取位置啊之类的数据，在Transform里设置不会起效果...（历史遗留问题
 class MainCamera : public GameObject {
  public:
   MainCamera();
@@ -141,8 +142,9 @@ class RenderPass : public IRenderPass {
   std::shared_ptr<ProgramOpenGL>& GetProgram();
   RenderContextOpenGL& GetContext();
   Vector2i GetFrameBufferSize();
-  int GetFBWidth();
-  int GetFBHeight();
+  int GetFrameBufferWidth();
+  int GetFrameBufferHeight();
+  void SetViewportFullFrameBuffer();
   std::unique_ptr<Camera>& GetCamera();
   void SetProgram(const std::shared_ptr<ProgramOpenGL>& prog);
   void SetProgram(const std::string& vs, const std::string& fs, const ShaderAttributeLayouts& layouts);

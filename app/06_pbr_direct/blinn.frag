@@ -20,7 +20,7 @@ void main() {
 
   vec3 radiance = ambient;
   for(int i = 0; i < GetDirLightCount(); i++) {
-    radiance += BlinnPhong(u_blinn, n, GetDirLightDirection(i), GetDirLightRadiance(i), cameraPos, fragPos);
+    radiance += BlinnPhong(u_blinn, n, -GetDirLightDirection(i), GetDirLightRadiance(i), cameraPos, fragPos);
   }
 
   vec3 blinnColor = pow(radiance, vec3(1.0 / 2.2));

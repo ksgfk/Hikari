@@ -75,7 +75,7 @@ class ColorPass : public RenderPass {
     auto& ctx = GetContext();
     ctx.SetClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     ctx.ClearColor();
-    ctx.SetViewport(0, 0, GetFBWidth(), GetFBHeight());
+    ctx.SetViewport(0, 0, GetFrameBufferWidth(), GetFrameBufferHeight());
     ActiveProgram();
     prog->UniformMat4("model", _tri->GetTransform().ObjectToWorldMatrix().GetAddress());
     prog->UniformMat4("view", GetCamera()->GetViewMatrix().GetAddress());
