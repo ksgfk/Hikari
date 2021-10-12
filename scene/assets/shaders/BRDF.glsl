@@ -36,7 +36,9 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
 vec3 FresnelSchlick(vec3 F0, vec3 V, vec3 H) {
   float theta = dot(V, H);
   theta = clamp(theta, 0.0, 1.0);
-  return F0 + (1.0 - F0) * pow(1.0 - theta, 5.0);
+  float b = 1.0 - theta;
+  float b5 = b * b * b * b * b; //pow(b, 5.0)
+  return F0 + (1.0 - F0) * b5;
 }
 
 struct BlinnPhongMaterial {

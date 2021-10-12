@@ -1273,6 +1273,7 @@ TextureOpenGL::TextureOpenGL(const DepthTextureDescriptorOpenGL& desc) {
   _type = TextureType::Image2d;
   _width = desc.Width;
   _height = desc.Height;
+  _pixelFormat = desc.TextureFormat;
 }
 
 void TextureOpenGL::Delete() {
@@ -1288,6 +1289,7 @@ TextureOpenGL::TextureOpenGL(TextureOpenGL&& other) noexcept {
   _type = other._type;
   _width = other._width;
   _height = other._height;
+  _pixelFormat = other._pixelFormat;
 }
 
 TextureOpenGL& TextureOpenGL::operator=(TextureOpenGL&& other) noexcept {
@@ -1296,6 +1298,7 @@ TextureOpenGL& TextureOpenGL::operator=(TextureOpenGL&& other) noexcept {
   _type = other._type;
   _width = other._width;
   _height = other._height;
+  _pixelFormat = other._pixelFormat;
   return *this;
 }
 
@@ -1349,16 +1352,16 @@ GLuint TextureOpenGL::MapWrapMode(WrapMode mode) {
   }
 }
 
-GLint TextureOpenGL::MapPixelFormat(ColorFormat format) {
+GLint TextureOpenGL::MapPixelFormat(ImageDataFormat format) {
   switch (format) {
-    case ColorFormat::RGB:
+    case ImageDataFormat::RGB:
       return GL_RGB;
-    case ColorFormat::RGBA:
+    case ImageDataFormat::RGBA:
       return GL_RGBA;
-    case ColorFormat::Depth:
+    case ImageDataFormat::Depth:
       return GL_DEPTH_COMPONENT;
     default:
-      throw OpenGLException("unknown ColorFormat");
+      throw OpenGLException("unknown ImageDataFormat");
   }
 }
 
@@ -1421,17 +1424,19 @@ void TextureOpenGL::CreateTexture2d(const Texture2dDescriptorOpenGL& desc, Textu
       HIKARI_CHECK_GL(glTexStorage2D(GL_TEXTURE_2D, levels, texFormat, width, height));
       HIKARI_CHECK_GL(glTextureSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, dataFormat, dataType, desc.DataPtr));
     } else {
+      HIKARI_CHECK_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, levels - 1));
       HIKARI_CHECK_GL(glTexImage2D(GL_TEXTURE_2D,
                                    0,
                                    texFormat,
                                    width, height,
                                    0,
-                                   dataFormat, dataType, static_cast<GLvoid*>(desc.DataPtr)));
+                                   dataFormat, dataType, static_cast<const GLvoid*>(desc.DataPtr)));
     }
     HIKARI_CHECK_GL(glGenerateMipmap(GL_TEXTURE_2D));
     HIKARI_CHECK_GL(glBindTexture(GL_TEXTURE_2D, 0));
   }
   texture._type = TextureType::Image2d;
+  texture._pixelFormat = desc.TextureFormat;
 }
 
 void TextureOpenGL::CreateCubeMap(const TextureCubeMapDescriptorOpenGL& desc, TextureOpenGL& texture) {
@@ -1453,6 +1458,9 @@ void TextureOpenGL::CreateCubeMap(const TextureCubeMapDescriptorOpenGL& desc, Te
     HIKARI_CHECK_GL(glTextureParameteri(name, GL_TEXTURE_WRAP_R, wrap));
     HIKARI_CHECK_GL(glTextureStorage2D(name, levels, texFormat, desc.Width, desc.Height));
     for (int i = 0; i < 6; i++) {
+      if (desc.DataPtr[i] == nullptr) {
+        continue;
+      }
       auto dataFormat = (GLenum)MapPixelFormat(desc.DataFormat[i]);
       auto dataType = MapTextureDataType(desc.DataType[i]);
       HIKARI_CHECK_GL(glTextureSubImage3D(name,
@@ -1474,8 +1482,11 @@ void TextureOpenGL::CreateCubeMap(const TextureCubeMapDescriptorOpenGL& desc, Te
     HIKARI_CHECK_GL(glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, wrap));
     auto texFormat = static_cast<GLenum>(desc.TextureFormat);
     if (feature.CanUseTextureStorage()) {
-      glTexStorage2D(GL_TEXTURE_CUBE_MAP, levels, texFormat, desc.Width, desc.Height);
+      HIKARI_CHECK_GL(glTexStorage2D(GL_TEXTURE_CUBE_MAP, levels, texFormat, desc.Width, desc.Height));
       for (int i = 0; i < 6; i++) {
+        if (desc.DataPtr[i] == nullptr) {
+          continue;
+        }
         auto dataFormat = (GLenum)MapPixelFormat(desc.DataFormat[i]);
         auto dataType = MapTextureDataType(desc.DataType[i]);
         HIKARI_CHECK_GL(glTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0,
@@ -1494,7 +1505,7 @@ void TextureOpenGL::CreateCubeMap(const TextureCubeMapDescriptorOpenGL& desc, Te
                                      texFormat,
                                      desc.Width, desc.Height,
                                      0,  //*永远* 是0
-                                     dataFormat, dataType, static_cast<GLvoid*>(desc.DataPtr[i])));
+                                     dataFormat, dataType, static_cast<const GLvoid*>(desc.DataPtr[i])));
       }
     }
     HIKARI_CHECK_GL(glGenerateMipmap(GL_TEXTURE_CUBE_MAP));
@@ -1539,6 +1550,54 @@ FrameBufferOpenGL::FrameBufferOpenGL(const FrameBufferDepthDescriptor& depth) {
   }
 }
 
+FrameBufferOpenGL::FrameBufferOpenGL(const FrameBufferRenderDescriptor& desc) {
+  auto getRboType = [](RenderBufferType type, int colorIdx) -> GLenum {
+    switch (type) {
+      case RenderBufferType::RGBA8:
+        return GL_COLOR_ATTACHMENT0 + colorIdx;
+      case RenderBufferType::Depth:
+        return GL_DEPTH_ATTACHMENT;
+        break;
+      default:
+        throw OpenGLException("unknown render buffer type");
+    }
+  };
+
+  const auto& feature = FeatureOpenGL::Get();
+  GLenum status{};
+  if (feature.CanUseDirectStateAccess()) {
+    HIKARI_CHECK_GL(glCreateFramebuffers(1, &_handle));
+    int colorIdx = 0;
+    for (const auto& renderBuffer : desc.RenderBuffers) {
+      GLenum attachType = getRboType(renderBuffer->GetType(), colorIdx);
+      HIKARI_CHECK_GL(glNamedFramebufferRenderbuffer(_handle,
+                                                     attachType,
+                                                     GL_RENDERBUFFER,
+                                                     renderBuffer->GetHandle()));
+      if (attachType == GL_COLOR_ATTACHMENT0 + colorIdx) {
+        colorIdx++;
+      }
+    }
+    status = HIKARI_CHECK_GL(glCheckNamedFramebufferStatus(_handle, GL_FRAMEBUFFER));
+  } else {
+    HIKARI_CHECK_GL(glGenFramebuffers(1, &_handle));
+    HIKARI_CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, _handle));
+    int colorIdx = 0;
+    for (const auto& renderBuffer : desc.RenderBuffers) {
+      GLenum attachType = getRboType(renderBuffer->GetType(), colorIdx);
+      HIKARI_CHECK_GL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, attachType, GL_RENDERBUFFER, renderBuffer->GetHandle()));
+      if (attachType == GL_COLOR_ATTACHMENT0 + colorIdx) {
+        colorIdx++;
+      }
+    }
+    status = HIKARI_CHECK_GL(glCheckFramebufferStatus(GL_FRAMEBUFFER));
+    HIKARI_CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+  }
+  if (status != GL_FRAMEBUFFER_COMPLETE) {
+    throw OpenGLException(std::string("can't create depth framebuffer code:") + std::to_string(status));
+  }
+}
+
 FrameBufferOpenGL::FrameBufferOpenGL(FrameBufferOpenGL&& other) noexcept {
   _handle = other._handle;
   other._handle = 0;
@@ -1575,6 +1634,66 @@ void FrameBufferOpenGL::Delete() {
 
 bool FrameBufferOpenGL::IsValid() const {
   return _handle != 0;
+}
+
+RenderBufferOpenGL::RenderBufferOpenGL() noexcept = default;
+
+RenderBufferOpenGL::RenderBufferOpenGL(const RenderBufferDescriptor& desc) {
+  const auto& feature = FeatureOpenGL::Get();
+  if (feature.CanUseDirectStateAccess()) {
+    HIKARI_CHECK_GL(glCreateRenderbuffers(1, &_handle));
+    HIKARI_CHECK_GL(glNamedRenderbufferStorage(_handle, static_cast<GLenum>(desc.Type), desc.Width, desc.Height));
+  } else {
+    HIKARI_CHECK_GL(glGenRenderbuffers(1, &_handle));
+    HIKARI_CHECK_GL(glBindRenderbuffer(GL_RENDERBUFFER, _handle));
+    HIKARI_CHECK_GL(glRenderbufferStorage(GL_RENDERBUFFER, static_cast<GLenum>(desc.Type), desc.Width, desc.Height));
+    HIKARI_CHECK_GL(glBindRenderbuffer(GL_RENDERBUFFER, 0));
+  }
+}
+
+RenderBufferOpenGL::RenderBufferOpenGL(RenderBufferOpenGL&& other) noexcept {
+  _handle = other._handle;
+  other._handle = 0;
+  _type = other._type;
+}
+
+RenderBufferOpenGL& RenderBufferOpenGL::operator=(RenderBufferOpenGL&& other) noexcept {
+  _handle = other._handle;
+  other._handle = 0;
+  _type = other._type;
+  return *this;
+}
+
+RenderBufferOpenGL::~RenderBufferOpenGL() noexcept { Delete(); }
+
+bool RenderBufferOpenGL::IsValid() const { return HIKARI_CHECK_GL(glIsRenderbuffer(_handle)); }
+
+void RenderBufferOpenGL::Destroy() { Delete(); }
+
+GLuint RenderBufferOpenGL::GetHandle() const { return _handle; }
+
+RenderBufferType RenderBufferOpenGL::GetType() const { return _type; }
+
+void RenderBufferOpenGL::Bind() const { HIKARI_CHECK_GL(glBindRenderbuffer(GL_RENDERBUFFER, _handle)); }
+
+void RenderBufferOpenGL::Unbind() const { HIKARI_CHECK_GL(glBindRenderbuffer(GL_RENDERBUFFER, 0)); }
+
+RenderBufferType RenderBufferOpenGL::MapType(GLenum type) {
+  switch (type) {
+    case GL_RGBA8:
+      return RenderBufferType::RGBA8;
+    case GL_DEPTH_COMPONENT:
+      return RenderBufferType::Depth;
+    default:
+      throw OpenGLException("unknown render buffer type");
+  }
+}
+
+void RenderBufferOpenGL::Delete() {
+  if (_handle != 0) {
+    HIKARI_CHECK_GL(glDeleteRenderbuffers(1, &_handle));
+    _handle = 0;
+  }
 }
 
 }  // namespace Hikari

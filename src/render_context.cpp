@@ -11,6 +11,8 @@
 #include <spirv_cross.hpp>
 #include <spirv_glsl.hpp>
 
+#include <hikari/asset.h>
+
 namespace Hikari {
 //从glslang里cv来的（
 constexpr const TBuiltInResource __BuiltInRes = {
@@ -310,6 +312,160 @@ std::shared_ptr<FrameBufferOpenGL> RenderContextOpenGL::CreateFrameBuffer(const 
   auto fbo = std::make_shared<FrameBufferOpenGL>(desc);
   AddObjectToSet(fbo);
   return fbo;
+}
+
+std::shared_ptr<FrameBufferOpenGL> RenderContextOpenGL::CreateFrameBuffer(const FrameBufferRenderDescriptor& desc) {
+  CheckInit();
+  auto fbo = std::make_shared<FrameBufferOpenGL>(desc);
+  AddObjectToSet(fbo);
+  return fbo;
+}
+
+std::shared_ptr<RenderBufferOpenGL> RenderContextOpenGL::CreateRenderBuffer(const RenderBufferDescriptor& desc) {
+  CheckInit();
+  auto rbo = std::make_shared<RenderBufferOpenGL>(desc);
+  AddObjectToSet(rbo);
+  return rbo;
+}
+
+std::shared_ptr<TextureOpenGL> RenderContextOpenGL::ConvertEquirectangularToCubemap(
+    const Texture2dDescriptorOpenGL& tex2d,
+    const TextureCubeMapDescriptorOpenGL& cubeConfig,
+    const std::filesystem::path& shaderLib) {
+  for (int i = 0; i < 6; i++) {
+    if (cubeConfig.DataPtr[i] != nullptr) {
+      throw OpenGLException("cube map DataPtr should be null");
+    }
+  }
+  auto rect = CreateTexture2D(tex2d);        //上传纹理
+  auto cubemap = CreateCubeMap(cubeConfig);  //为cubemap分配空间
+  std::shared_ptr<BufferOpenGL> vbo;         //立方体
+  int verCnt{};
+  {
+    auto cubeModel = ImmutableModel::CreateCube("cube", 1);
+    auto d = GenVboDataPNT(cubeModel.GetPosition(), {}, {}, cubeModel.GetIndices());
+    auto data = d.data();
+    auto size = d.size() * sizeof(decltype(d)::value_type);
+    vbo = CreateVertexBuffer(data, size);
+    verCnt = int(cubeModel.GetIndexCount());
+  }
+  ImmutableText vs("vs", shaderLib / "EquirectToCubeMap.vert");
+  ImmutableText fs("fs", shaderLib / "EquirectToCubeMap.frag");
+  auto prog = CreateShaderProgram(vs.GetText(), fs.GetText(), {POSITION0()});  //转换shader
+  GLuint captureFBO, captureRBO;
+  HIKARI_CHECK_GL(glGenFramebuffers(1, &captureFBO));
+  HIKARI_CHECK_GL(glGenRenderbuffers(1, &captureRBO));
+  HIKARI_CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, captureFBO));
+  HIKARI_CHECK_GL(glBindRenderbuffer(GL_RENDERBUFFER, captureRBO));
+  //附加深度
+  HIKARI_CHECK_GL(glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, cubeConfig.Width, cubeConfig.Height));
+  HIKARI_CHECK_GL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO));
+  Matrix4f proj = Perspective(Radian(90), 1.0f, 0.1f, 10.0f);
+  Matrix4f view[6] = {
+      LookAt(Vector3f{0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}),
+      LookAt(Vector3f{0.0f}, {-1.0f, 0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}),
+      LookAt(Vector3f{0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}),
+      LookAt(Vector3f{0.0f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, -1.0f}),
+      LookAt(Vector3f{0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}),
+      LookAt(Vector3f{0.0f}, {0.0f, 0.0f, -1.0f}, {0.0f, -1.0f, 0.0f})};
+  HIKARI_CHECK_GL(glEnable(GL_DEPTH_TEST));
+  prog->Bind();
+  auto& vao = GetVertexArray(prog);
+  vao.Bind();
+  HIKARI_CHECK_GL(glActiveTexture(GL_TEXTURE0));
+  HIKARI_CHECK_GL(glBindTexture(GL_TEXTURE_2D, rect->GetHandle()));
+  prog->UniformMat4("projection", proj.GetAddress());
+  prog->UniformTexture2D("u_equirectangularMap", 0);
+  SetViewport(0, 0, cubeConfig.Width, cubeConfig.Height);
+  for (int i = 0; i < 6; i++) {
+    prog->UniformMat4("view", view[i].GetAddress());
+    HIKARI_CHECK_GL(glFramebufferTexture2D(GL_FRAMEBUFFER,
+                                           GL_COLOR_ATTACHMENT0,
+                                           GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                                           cubemap->GetHandle(),
+                                           0));
+    HIKARI_CHECK_GL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+    auto layout = GetVertexLayoutPositionPNT();
+    auto bp = prog->GetBindingPoint(layout.Semantic);
+    vao.SetVertexBuffer({(GLuint)bp, vbo->GetHandle(), layout.Offset, layout.Stride});
+    DrawArrays(PrimitiveMode::Triangles, 0, verCnt);
+  }
+  HIKARI_CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+
+  //清理
+  DestroyObject(rect);
+  DestroyObject(vbo);
+  DestroyObject(prog);
+  HIKARI_CHECK_GL(glDeleteFramebuffers(1, &captureFBO));
+  HIKARI_CHECK_GL(glDeleteRenderbuffers(1, &captureRBO));
+
+  return cubemap;
+}
+
+std::shared_ptr<TextureOpenGL> RenderContextOpenGL::GenIrradianceConvolutionCubemap(
+    const std::shared_ptr<TextureOpenGL>& irradiance,
+    const TextureCubeMapDescriptorOpenGL& cubeConfig,
+    const std::filesystem::path& shaderLib) {
+  auto cubemap = CreateCubeMap(cubeConfig);  //为cubemap分配空间
+  std::shared_ptr<BufferOpenGL> vbo;         //立方体
+  int verCnt{};
+  {
+    auto cubeModel = ImmutableModel::CreateCube("cube", 1);
+    auto d = GenVboDataPNT(cubeModel.GetPosition(), {}, {}, cubeModel.GetIndices());
+    auto data = d.data();
+    auto size = d.size() * sizeof(decltype(d)::value_type);
+    vbo = CreateVertexBuffer(data, size);
+    verCnt = int(cubeModel.GetIndexCount());
+  }
+  ImmutableText vs("vs", shaderLib / "IrradianceConvolution.vert");
+  ImmutableText fs("fs", shaderLib / "IrradianceConvolution.frag");
+  auto prog = CreateShaderProgram(vs.GetText(), fs.GetText(), {POSITION0()});  //转换shader
+  GLuint captureFBO, captureRBO;
+  HIKARI_CHECK_GL(glGenFramebuffers(1, &captureFBO));
+  HIKARI_CHECK_GL(glGenRenderbuffers(1, &captureRBO));
+  HIKARI_CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, captureFBO));
+  HIKARI_CHECK_GL(glBindRenderbuffer(GL_RENDERBUFFER, captureRBO));
+  HIKARI_CHECK_GL(glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, cubeConfig.Width, cubeConfig.Height));
+  HIKARI_CHECK_GL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO));
+  Matrix4f proj = Perspective(Radian(90), 1.0f, 0.1f, 10.0f);
+  Matrix4f view[6] = {
+      LookAt(Vector3f{0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}),
+      LookAt(Vector3f{0.0f}, {-1.0f, 0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}),
+      LookAt(Vector3f{0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}),
+      LookAt(Vector3f{0.0f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f, -1.0f}),
+      LookAt(Vector3f{0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}),
+      LookAt(Vector3f{0.0f}, {0.0f, 0.0f, -1.0f}, {0.0f, -1.0f, 0.0f})};
+  HIKARI_CHECK_GL(glEnable(GL_DEPTH_TEST));
+  prog->Bind();
+  auto& vao = GetVertexArray(prog);
+  vao.Bind();
+  HIKARI_CHECK_GL(glActiveTexture(GL_TEXTURE0));
+  HIKARI_CHECK_GL(glBindTexture(GL_TEXTURE_CUBE_MAP, irradiance->GetHandle()));
+  prog->UniformMat4("projection", proj.GetAddress());
+  prog->UniformCubeMap("u_Cube", 0);
+  SetViewport(0, 0, cubeConfig.Width, cubeConfig.Height);
+  for (int i = 0; i < 6; i++) {
+    prog->UniformMat4("view", view[i].GetAddress());
+    HIKARI_CHECK_GL(glFramebufferTexture2D(GL_FRAMEBUFFER,
+                                           GL_COLOR_ATTACHMENT0,
+                                           GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                                           cubemap->GetHandle(),
+                                           0));
+    HIKARI_CHECK_GL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+    auto layout = GetVertexLayoutPositionPNT();
+    auto bp = prog->GetBindingPoint(layout.Semantic);
+    vao.SetVertexBuffer({(GLuint)bp, vbo->GetHandle(), layout.Offset, layout.Stride});
+    DrawArrays(PrimitiveMode::Triangles, 0, verCnt);
+  }
+  HIKARI_CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+
+  //清理
+  DestroyObject(vbo);
+  DestroyObject(prog);
+  HIKARI_CHECK_GL(glDeleteFramebuffers(1, &captureFBO));
+  HIKARI_CHECK_GL(glDeleteRenderbuffers(1, &captureRBO));
+
+  return cubemap;
 }
 
 void RenderContextOpenGL::AddUniformBlocks(const ProgramOpenGL& prog) {

@@ -95,7 +95,7 @@ class SkyboxPass : public RenderPass {
     cubeDesc.Width = 2048;
     cubeDesc.Height = 2048;
     for (size_t i = 0; i < 6; i++) {
-      cubeDesc.DataFormat[i] = bitmap[i].GetChannel() == 3 ? ColorFormat::RGB : ColorFormat::RGBA;
+      cubeDesc.DataFormat[i] = bitmap[i].GetChannel() == 3 ? ImageDataFormat::RGB : ImageDataFormat::RGBA;
       cubeDesc.DataType[i] = ImageDataType::Byte;
       cubeDesc.DataPtr[i] = (void*)bitmap[i].GetData();
     }

@@ -73,7 +73,7 @@ int ImmutableBitmap::GetChannel() const {
   return _channelCount;
 }
 
-const uint8_t* ImmutableBitmap::GetData() const {
+const uint8_t* const ImmutableBitmap::GetData() const {
   return _data;
 }
 
@@ -91,6 +91,67 @@ bool ImmutableBitmap::LoadFromDisk(const std::string& name,
   texture._name = name;
   return data != nullptr;
 }
+
+ImmutableHdrTexture::ImmutableHdrTexture() noexcept = default;
+
+ImmutableHdrTexture::ImmutableHdrTexture(const std::string& name, const std::filesystem::path& path, bool isFilpY) {
+  stbi_set_flip_vertically_on_load(isFilpY);
+  int width, height, channels;
+  auto data = stbi_loadf((const char*)path.generic_u8string().c_str(), &width, &height, &channels, 0);
+  if (data == nullptr) {
+    throw AssetLoadException("can't load from disk");
+  }
+  _width = width;
+  _height = height;
+  _channelCount = channels;
+  _data = data;
+  _name = name;
+}
+
+ImmutableHdrTexture::ImmutableHdrTexture(ImmutableHdrTexture&& other) noexcept {
+  _width = other._width;
+  _height = other._height;
+  _channelCount = other._channelCount;
+  _data = other._data;
+  other._data = nullptr;
+  _name = std::move(other._name);
+}
+
+ImmutableHdrTexture& ImmutableHdrTexture::operator=(ImmutableHdrTexture&& other) noexcept {
+  _width = other._width;
+  _height = other._height;
+  _channelCount = other._channelCount;
+  _data = other._data;
+  other._data = nullptr;
+  _name = std::move(other._name);
+  return *this;
+}
+
+ImmutableHdrTexture::~ImmutableHdrTexture() noexcept {
+  if (_data != nullptr) {
+    stbi_image_free(_data);
+    _data = nullptr;
+  }
+}
+
+const std::string& ImmutableHdrTexture::GetName() const { return _name; }
+
+bool ImmutableHdrTexture::IsValid() const { return _data != nullptr; }
+
+void ImmutableHdrTexture::Release() {
+  if (_data != nullptr) {
+    stbi_image_free(_data);
+    _data = nullptr;
+  }
+}
+
+int ImmutableHdrTexture::GetWidth() const { return _width; }
+
+int ImmutableHdrTexture::GetHeight() const { return _height; }
+
+int ImmutableHdrTexture::GetChannel() const { return _channelCount; }
+
+const float* const ImmutableHdrTexture::GetData() const { return _data; }
 
 ImmutableModel::ImmutableModel() noexcept = default;
 

@@ -121,6 +121,7 @@ class IRenderPass {
   virtual const std::string& GetName() const = 0;
   virtual int GetPriority() const = 0;
   virtual void OnStart() = 0;
+  virtual void OnPostStart() = 0;
   virtual void OnUpdate() = 0;
   virtual ProgramOpenGL& GetPipelineProgram() = 0;
   virtual bool HasPipelineProgram() = 0;
@@ -134,6 +135,7 @@ class RenderPass : public IRenderPass {
   const std::string& GetName() const override;
   int GetPriority() const override;
   void OnStart() override;
+  void OnPostStart() override;
   void OnUpdate() override;
   ProgramOpenGL& GetPipelineProgram() override;
   bool HasPipelineProgram() override;

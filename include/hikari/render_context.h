@@ -111,6 +111,19 @@ class RenderContextOpenGL {
   std::shared_ptr<TextureOpenGL> CreateCubeMap(const TextureCubeMapDescriptorOpenGL& desc);
   std::shared_ptr<TextureOpenGL> CreateDepthTexture(const DepthTextureDescriptorOpenGL& desc);
   std::shared_ptr<FrameBufferOpenGL> CreateFrameBuffer(const FrameBufferDepthDescriptor& desc);
+  std::shared_ptr<FrameBufferOpenGL> CreateFrameBuffer(const FrameBufferRenderDescriptor& desc);
+  std::shared_ptr<RenderBufferOpenGL> CreateRenderBuffer(const RenderBufferDescriptor& desc);
+  /**
+   * @brief 将等距柱状投影图转换为立方体图
+   */
+  std::shared_ptr<TextureOpenGL> ConvertEquirectangularToCubemap(
+      const Texture2dDescriptorOpenGL& tex2d,
+      const TextureCubeMapDescriptorOpenGL& cubeConfig,
+      const std::filesystem::path& shaderLib);
+  std::shared_ptr<TextureOpenGL> GenIrradianceConvolutionCubemap(
+      const std::shared_ptr<TextureOpenGL>& irradiance,
+      const TextureCubeMapDescriptorOpenGL& cubeConfig,
+      const std::filesystem::path& shaderLib);
   void AddUniformBlocks(const ProgramOpenGL& prog);
   void DestroyObject(const std::shared_ptr<ObjectOpenGL>& ptr);
   void DestroyObject(const std::shared_ptr<ProgramOpenGL>& ptr);

@@ -40,8 +40,7 @@ void main() {
     vec3 kd = (vec3(1.0) - ks) * (1.0 - metallic); //折射比值
     vec3 diffuse = kd * albedo * INV_PI;
 
-    vec3 brdf = cookTorrance + diffuse;
-    //vec3 brdf = cookTorrance;
+    vec3 brdf = cookTorrance + diffuse; //按比值将镜面反射和漫反射叠在一起，简单保证能量守恒，不保证物理
 
     Lo += brdf * Li * NdotL;
   }

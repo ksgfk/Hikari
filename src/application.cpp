@@ -276,6 +276,8 @@ int RenderPass::GetPriority() const { return _priority; }
 
 void RenderPass::OnStart() {}
 
+void RenderPass::OnPostStart() {}
+
 void RenderPass::OnUpdate() {}
 
 ProgramOpenGL& RenderPass::GetPipelineProgram() { return *_prog; }
@@ -313,8 +315,20 @@ void RenderPass::SetProgram(const std::string& vs, const std::string& fs, const 
 
 void RenderPass::LoadProgram(const std::filesystem::path& vsPath, const std::filesystem::path& fsPath,
                              const ShaderAttributeLayouts& layouts) {
-  ImmutableText vs("vs", vsPath);
-  ImmutableText fs("fs", fsPath);
+  std::filesystem::path resVsPath;
+  if (std::filesystem::exists(vsPath)) {
+    resVsPath = vsPath;
+  } else {
+    resVsPath = GetApp().GetShaderLibPath() / vsPath;
+  }
+  std::filesystem::path resFsPath;
+  if (std::filesystem::exists(fsPath)) {
+    resFsPath = fsPath;
+  } else {
+    resFsPath = GetApp().GetShaderLibPath() / fsPath;
+  }
+  ImmutableText vs("vs", resVsPath);
+  ImmutableText fs("fs", resFsPath);
   auto& ctx = GetContext();
   std::string resVs;
   if (!ctx.PreprocessShader(ShaderType::Vertex, vs.GetText(), resVs)) {
@@ -464,10 +478,9 @@ void Application::Awake() {
   std::cout << "renderer:" << feature.GetHardwareInfo() << std::endl;
   std::cout << "driver:" << feature.GetDriverInfo() << std::endl;
   if (_shaderLibRoot.empty()) {
-    _context.Init(_assetRoot / "shaders");
-  } else {
-    _context.Init(_shaderLibRoot);
+    _shaderLibRoot = _assetRoot / "shaders";
   }
+  _context.Init(_shaderLibRoot);
   if (_camera->Camera == nullptr) {
     _camera->Camera = std::make_unique<PerspectiveCamera>();  //假装是透视相机
   }
@@ -476,6 +489,9 @@ void Application::Awake() {
   }
   for (auto& renderPass : _renderPasses) {
     renderPass->OnStart();
+  }
+  for (auto& renderPass : _renderPasses) {
+    renderPass->OnPostStart();
   }
   if (feature.GetMajorVersion() >= 4 && feature.GetMinorVersion() >= 1) {
     HIKARI_CHECK_GL(glReleaseShaderCompiler());

@@ -33,6 +33,7 @@ class ProgramOpenGL;
 class VertexArrayOpenGL;
 class TextureOpenGL;
 class FrameBufferOpenGL;
+class RenderBufferOpenGL;
 
 class OpenGLException : public std::runtime_error {
  public:
@@ -440,7 +441,7 @@ enum class FilterMode {
   Trilinear  //各向异性呢
 };
 
-enum class ColorFormat {
+enum class ImageDataFormat {
   RGB,
   RGBA,
   Depth
@@ -449,6 +450,10 @@ enum class ColorFormat {
 enum class PixelFormat : GLenum {
   RGB8 = GL_RGB8,
   RGBA8 = GL_RGBA8,
+  RGB16F = GL_RGB16F,
+  RGBA16F = GL_RGBA16F,
+  RGB32F = GL_RGB32F,
+  RGBA32F = GL_RGBA32F,
   Depth16 = GL_DEPTH_COMPONENT16,
   Depth24 = GL_DEPTH_COMPONENT24,
   Depth32 = GL_DEPTH_COMPONENT32,
@@ -467,9 +472,9 @@ struct Texture2dDescriptorOpenGL {
   PixelFormat TextureFormat;
   int Width;
   int Height;
-  ColorFormat DataFormat;
+  ImageDataFormat DataFormat;
   ImageDataType DataType;
-  void* DataPtr;
+  const void* DataPtr;
 };
 
 struct TextureCubeMapDescriptorOpenGL {
@@ -481,9 +486,9 @@ struct TextureCubeMapDescriptorOpenGL {
   //为了方便，cubemap所有面纹理长宽都应该一致
   int Width;
   int Height;
-  ColorFormat DataFormat[6];
+  ImageDataFormat DataFormat[6];
   ImageDataType DataType[6];
-  void* DataPtr[6];
+  const void* DataPtr[6];
 };
 
 struct DepthTextureDescriptorOpenGL {
@@ -512,10 +517,11 @@ class TextureOpenGL : public ObjectOpenGL {
   TextureType GetType() const;
   int GetWidth() const;
   int GetHeight() const;
+  constexpr PixelFormat GetPixelFormat() const { return _pixelFormat; }
 
   static GLuint MapFilterMode(FilterMode mode);
   static GLuint MapWrapMode(WrapMode mode);
-  static GLint MapPixelFormat(ColorFormat format);
+  static GLint MapPixelFormat(ImageDataFormat format);
   static GLenum MapTextureDataType(ImageDataType format);
   static GLsizei CalcMipmapLevels(int mipmapLevel, int maxSize, bool isUseTrilinear);
   static void CreateTexture2d(const Texture2dDescriptorOpenGL& desc, TextureOpenGL& texture);
@@ -528,16 +534,22 @@ class TextureOpenGL : public ObjectOpenGL {
   TextureType _type{};
   int _width{};
   int _height{};
+  PixelFormat _pixelFormat{};
 };
 
 struct FrameBufferDepthDescriptor {
   GLuint Texture2D;
 };
 
+struct FrameBufferRenderDescriptor {
+  std::vector<std::shared_ptr<RenderBufferOpenGL>> RenderBuffers;
+};
+
 class FrameBufferOpenGL : public ObjectOpenGL {
  public:
   FrameBufferOpenGL() noexcept;
   FrameBufferOpenGL(const FrameBufferDepthDescriptor& depth);
+  FrameBufferOpenGL(const FrameBufferRenderDescriptor& desc);
   FrameBufferOpenGL(FrameBufferOpenGL&&) noexcept;
   FrameBufferOpenGL& operator=(FrameBufferOpenGL&&) noexcept;
   ~FrameBufferOpenGL() noexcept override;
@@ -550,6 +562,44 @@ class FrameBufferOpenGL : public ObjectOpenGL {
  private:
   void Delete();
   GLuint _handle{};
+};
+
+enum class RenderBufferType : GLenum {
+  RGBA8 = GL_RGBA8,
+  Depth = GL_DEPTH_COMPONENT
+};
+
+struct RenderBufferDescriptor {
+  int Width;
+  int Height;
+  RenderBufferType Type;
+};
+
+class RenderBufferOpenGL : public ObjectOpenGL {
+ public:
+  RenderBufferOpenGL() noexcept;
+  RenderBufferOpenGL(const RenderBufferDescriptor& desc);
+  RenderBufferOpenGL(RenderBufferOpenGL&&) noexcept;
+  RenderBufferOpenGL& operator=(RenderBufferOpenGL&&) noexcept;
+  ~RenderBufferOpenGL() noexcept override;
+  bool IsValid() const override;
+  void Destroy() override;
+
+  GLuint GetHandle() const;
+  RenderBufferType GetType() const;
+  void Bind() const;
+  void Unbind() const;
+  constexpr int GetWidth() const { return _width; }
+  constexpr int GetHeight() const { return _height; }
+
+  static RenderBufferType MapType(GLenum type);
+
+ private:
+  void Delete();
+  GLuint _handle{};
+  RenderBufferType _type{};
+  int _width{};
+  int _height{};
 };
 
 }  // namespace Hikari

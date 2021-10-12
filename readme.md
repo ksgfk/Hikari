@@ -45,6 +45,14 @@ Linux Ubuntu下，Clang10编译运行通过，GCC没试（懒
 src/application.cpp文件里，`ParseArgs`函数里列出了所有支持的命令行参数
 
 ## Show 结果展示
+### 7.Irradiance Convolution
+
+<img src="show/7-irradiance_convolution.png" alt="7-irradiance_convolution.png" width="50%">
+
+**注意：** 需要加载资源
+
+先将Spherical Map转换成Cube Map，再从整个Cube Map上选取所有方向，每个方向的半球上均匀采样，卷积，sinTheta作为权重
+
 ### 6.PBR Direct Light
 
 <img src="show/6-pbr_direct.png" alt="6-pbr_direct.png" width="50%">

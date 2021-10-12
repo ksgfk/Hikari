@@ -38,7 +38,7 @@ class Asset : public std::enable_shared_from_this<Asset> {
 };
 
 /**
-  * @brief 位图
+  * @brief 8bit 位图
   */
 class ImmutableBitmap : public Asset {
  public:
@@ -61,10 +61,10 @@ class ImmutableBitmap : public Asset {
   int GetWidth() const;
   int GetHeight() const;
   /**
-     * @brief 图像通道数量
+    * @brief 图像通道数量
     */
   int GetChannel() const;
-  const uint8_t* GetData() const;
+  const uint8_t* const GetData() const;
 
   static bool LoadFromDisk(const std::string&, const std::filesystem::path&, bool filpY, ImmutableBitmap&);
 
@@ -74,6 +74,34 @@ class ImmutableBitmap : public Asset {
   int _height{};
   int _channelCount{};
   uint8_t* _data{nullptr};
+};
+
+/**
+ * @brief 32bit HDR图片
+*/
+class ImmutableHdrTexture : public Asset {
+ public:
+  ImmutableHdrTexture() noexcept;
+  ImmutableHdrTexture(const std::string& name, const std::filesystem::path& path, bool isFilpY);
+  ImmutableHdrTexture(const ImmutableHdrTexture&) = delete;
+  ImmutableHdrTexture(ImmutableHdrTexture&&) noexcept;
+  ImmutableHdrTexture& operator=(ImmutableHdrTexture&&) noexcept;
+  ~ImmutableHdrTexture() noexcept override;
+  const std::string& GetName() const override;
+  bool IsValid() const override;
+  void Release() override;
+
+  int GetWidth() const;
+  int GetHeight() const;
+  int GetChannel() const;
+  const float* const GetData() const;
+
+ private:
+  std::string _name;
+  int _width{};
+  int _height{};
+  int _channelCount{};
+  float* _data{nullptr};
 };
 
 /**
