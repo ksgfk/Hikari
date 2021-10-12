@@ -529,6 +529,7 @@ void Application::Run() {
 }
 
 void Application::Destroy() {
+  _shared.clear();
   _camera = nullptr;
   _lights.Clear();
   _gameObjects.clear();
@@ -633,6 +634,10 @@ std::any& Application::GetSharedObject(const std::string& name) {
     throw AppRuntimeException(std::string("can't find shared object ") + name);
   }
   return iter->second;
+}
+
+bool Application::HasSharedObject(const std::string& name) {
+  return _shared.find(name) != _shared.end();
 }
 
 void Application::SetSharedObject(const std::string& name, std::any&& obj) {

@@ -45,6 +45,14 @@ Linux Ubuntu下，Clang10编译运行通过，GCC没试（懒
 src/application.cpp文件里，`ParseArgs`函数里列出了所有支持的命令行参数
 
 ## Show 结果展示
+### 8.Diffuse Irradiance
+
+<img src="show/8-diffuse_irradiance.png" alt="8-diffuse_irradiance.png" width="50%">
+
+**注意：** 需要加载资源
+
+使用预计算好的Irradiance Map替换掉漫反射计算，球体在环境中更加和谐了。但是，高光仍然只有来自点光源的反射，而且，高金属度高粗糙度下（也就是左上角的球）仍然没有实现多次散射能量补偿，看起来更加暗一些
+
 ### 7.Irradiance Convolution
 
 <img src="show/7-irradiance_convolution.png" alt="7-irradiance_convolution.png" width="50%">

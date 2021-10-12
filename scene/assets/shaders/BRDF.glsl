@@ -41,6 +41,14 @@ vec3 FresnelSchlick(vec3 F0, vec3 V, vec3 H) {
   return F0 + (1.0 - F0) * b5;
 }
 
+vec3 FresnelSchlickRoughness(vec3 F0, vec3 V, vec3 H, float roughness) {
+  float theta = dot(V, H);
+  theta = clamp(theta, 0.0, 1.0);
+  float b = 1.0 - theta;
+  float b5 = b * b * b * b * b;
+  return F0 + (max(vec3(1.0 - roughness), F0) - F0) * b5;
+}   
+
 struct BlinnPhongMaterial {
   vec3 kd;
   vec3 ks;

@@ -200,6 +200,7 @@ class Application {
   const std::filesystem::path& GetShaderLibPath() const;
   std::shared_ptr<GameObject> GetGameObject(const std::string& name);
   std::any& GetSharedObject(const std::string& name);
+  bool HasSharedObject(const std::string& name);
   float GetDeltaTime();
   float GetTime();
   float GetFps();
