@@ -315,32 +315,7 @@ void RenderPass::SetProgram(const std::string& vs, const std::string& fs, const 
 
 void RenderPass::LoadProgram(const std::filesystem::path& vsPath, const std::filesystem::path& fsPath,
                              const ShaderAttributeLayouts& layouts) {
-  std::filesystem::path resVsPath;
-  if (std::filesystem::exists(vsPath)) {
-    resVsPath = vsPath;
-  } else {
-    resVsPath = GetApp().GetShaderLibPath() / vsPath;
-  }
-  std::filesystem::path resFsPath;
-  if (std::filesystem::exists(fsPath)) {
-    resFsPath = fsPath;
-  } else {
-    resFsPath = GetApp().GetShaderLibPath() / fsPath;
-  }
-  ImmutableText vs("vs", resVsPath);
-  ImmutableText fs("fs", resFsPath);
-  auto& ctx = GetContext();
-  std::string resVs;
-  if (!ctx.PreprocessShader(ShaderType::Vertex, vs.GetText(), resVs)) {
-    std::cerr << "preprocess " << vsPath << " error" << std::endl;
-    throw RenderContextException("can't preprocess vertex shader");
-  }
-  std::string resFs;
-  if (!ctx.PreprocessShader(ShaderType::Fragment, fs.GetText(), resFs)) {
-    std::cerr << "preprocess " << fsPath << " error" << std::endl;
-    throw RenderContextException("can't preprocess fragment shader");
-  }
-  _prog = ctx.CreateShaderProgram(resVs, resFs, layouts);
+  _prog = GetContext().LoadShaderProgram(vsPath, fsPath, GetApp().GetShaderLibPath(), layouts);
 }
 
 PipelineState& RenderPass::GetPipelineState() { return _pipeState; }

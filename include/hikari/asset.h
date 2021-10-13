@@ -147,6 +147,7 @@ class ImmutableModel : public Asset {
   static bool LoadFromFile(const std::string&, const std::filesystem::path&, ImmutableModel&);
   static ImmutableModel CreateSphere(const std::string& name, float radius, int numberSlices);
   static ImmutableModel CreateCube(const std::string& name, float halfExtend);
+  static ImmutableModel CreateQuad(const std::string& name, float halfExtend);
 
  private:
   std::vector<Vector3f> _positions;

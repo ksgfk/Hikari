@@ -45,6 +45,14 @@ Linux Ubuntu下，Clang10编译运行通过，GCC没试（懒
 src/application.cpp文件里，`ParseArgs`函数里列出了所有支持的命令行参数
 
 ## Show 结果展示
+### 10.BRDF Lut
+
+<img src="show/10-brdf_lut.png" alt="10-brdf_lut.png" width="50%">
+
+**注意：** 需要加载资源
+
+使用Split-Sum Approximate将渲染方程拆成了两部分，第二部分是BRDF积分计算，这是一个带有4个参数的积分，不过人们发现，将Schlick近似（GGX Schlick和Fresnel Schlick）带入化简后，积分维度会降到二维，可以预计算，最终结果就是这张Lut（Look Up Texture）
+
 ### 9.Prefilter Environment Map
 
 <img src="show/9-prefilter_env.png" alt="9-prefilter_env.png" width="50%">

@@ -159,8 +159,8 @@ class SkyboxPass : public RenderPass {
 
 int main(int argc, char** argv) {
   auto& app = Application::GetInstance();
-  app.SetWindowCreateInfo({"Hikari Irradiance Convolution"});
-  app.SetRenderContextCreateInfo({4, 6});
+  app.SetWindowCreateInfo({"Hikari Prefilter Environment Map"});
+  app.SetRenderContextCreateInfo({3, 3});
   app.ParseArgs(argc, argv);
   app.CreatePass<ClearPass>();
   app.CreatePass<SkyboxPass>();

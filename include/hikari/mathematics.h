@@ -34,33 +34,33 @@ struct Quaternion;
   */
 template <typename Type, size_t Size>
 struct Vector {
-  Vector() noexcept = default;
+  constexpr Vector() noexcept = default;
 
-  explicit Vector(Type t) noexcept {
+  constexpr explicit Vector(Type t) noexcept {
     for (size_t i = 0; i < Size; i++) {
       v[i] = t;
     }
   }
 
   template <typename... Param, std::enable_if_t<sizeof...(Param) == Size, int> = 0>
-  Vector(Param... params) noexcept {
+  constexpr Vector(Param... params) noexcept {
     Type p[]{static_cast<Type>(params)...};
     for (size_t i = 0; i < Size; i++) {
       v[i] = p[i];
     }
   }
 
-  Type& operator[](size_t i) {
+  constexpr Type& operator[](size_t i) {
     assert(i < Size);
     return v[i];
   }
 
-  const Type& operator[](size_t i) const {
+  constexpr const Type& operator[](size_t i) const {
     assert(i < Size);
     return v[i];
   }
 
-  Vector operator+(const Vector& vec) const {  //vec是加号右边,this是加号左边
+  constexpr Vector operator+(const Vector& vec) const {  //vec是加号右边,this是加号左边
     Vector result;
     for (size_t i = 0; i < Size; i++) {
       result[i] = (*this)[i] + vec[i];
@@ -68,14 +68,14 @@ struct Vector {
     return result;
   }
 
-  Vector& operator+=(const Vector& vec) {
+  constexpr Vector& operator+=(const Vector& vec) {
     for (size_t i = 0; i < Size; i++) {
       (*this)[i] += vec.v[i];
     }
     return *this;
   }
 
-  Vector operator-(const Vector& vec) const {
+  constexpr Vector operator-(const Vector& vec) const {
     Vector result;
     for (size_t i = 0; i < Size; i++) {
       result[i] = (*this)[i] - vec[i];
@@ -83,14 +83,14 @@ struct Vector {
     return result;
   }
 
-  Vector& operator-=(const Vector& vec) {
+  constexpr Vector& operator-=(const Vector& vec) {
     for (size_t i = 0; i < Size; i++) {
       (*this)[i] -= vec.v[i];
     }
     return *this;
   }
 
-  Vector operator-() const {
+  constexpr Vector operator-() const {
     Vector result;
     for (size_t i = 0; i < Size; i++) {
       result[i] = -(*this)[i];
@@ -98,7 +98,7 @@ struct Vector {
     return result;
   }
 
-  Vector operator*(const Vector& vec) const {
+  constexpr Vector operator*(const Vector& vec) const {
     Vector result;
     for (size_t i = 0; i < Size; i++) {
       result[i] = (*this)[i] * vec[i];
@@ -106,14 +106,14 @@ struct Vector {
     return result;
   }
 
-  Vector& operator*=(const Vector& vec) {
+  constexpr Vector& operator*=(const Vector& vec) {
     for (size_t i = 0; i < Size; i++) {
       (*this)[i] *= vec.v[i];
     }
     return *this;
   }
 
-  Vector operator/(const Vector& vec) const {
+  constexpr Vector operator/(const Vector& vec) const {
     Vector result;
     for (size_t i = 0; i < Size; i++) {
       result[i] = (*this)[i] / vec[i];
@@ -121,14 +121,14 @@ struct Vector {
     return result;
   }
 
-  Vector& operator/=(const Vector& vec) {
+  constexpr Vector& operator/=(const Vector& vec) {
     for (size_t i = 0; i < Size; i++) {
       (*this)[i] /= vec.v[i];
     }
     return *this;
   }
 
-  bool operator==(const Vector& a) const {
+  constexpr bool operator==(const Vector& a) const {
     for (size_t i = 0; i < Size; i++) {
       if (v[i] != a.v[i]) {
         return false;
@@ -137,28 +137,28 @@ struct Vector {
     return true;
   }
 
-  bool operator!=(const Vector& a) const {
+  constexpr bool operator!=(const Vector& a) const {
     return !operator==(a);
   }
 
   template <size_t S = Size, std::enable_if_t<(S >= 1), int> = 0>
-  const Type& X() const { return v[0]; }
+  constexpr const Type& X() const { return v[0]; }
   template <size_t S = Size, std::enable_if_t<(S >= 1), int> = 0>
-  Type& X() { return v[0]; }
+  constexpr Type& X() { return v[0]; }
   template <size_t S = Size, std::enable_if_t<(S >= 2), int> = 0>
-  const Type& Y() const { return v[1]; }
+  constexpr const Type& Y() const { return v[1]; }
   template <size_t S = Size, std::enable_if_t<(S >= 2), int> = 0>
-  Type& Y() { return v[1]; }
+  constexpr Type& Y() { return v[1]; }
   template <size_t S = Size, std::enable_if_t<(S >= 3), int> = 0>
-  const Type& Z() const { return v[2]; }
+  constexpr const Type& Z() const { return v[2]; }
   template <size_t S = Size, std::enable_if_t<(S >= 3), int> = 0>
-  Type& Z() { return v[2]; }
+  constexpr Type& Z() { return v[2]; }
   template <size_t S = Size, std::enable_if_t<(S >= 4), int> = 0>
-  const Type& W() const { return v[3]; }
+  constexpr const Type& W() const { return v[3]; }
   template <size_t S = Size, std::enable_if_t<(S >= 4), int> = 0>
-  Type& W() { return v[3]; }
+  constexpr Type& W() { return v[3]; }
 
-  const Type* GetAddress() const { return v; }
+  constexpr const Type* GetAddress() const { return v; }
 
   friend std::ostream& operator<<(std::ostream& out, const Vector& m) {
     out << '<';
@@ -173,14 +173,14 @@ struct Vector {
   }
 
  private:
-  Type v[Size];
+  Type v[Size] = {};
 };
 
 /**
   * @brief 点乘
   */
 template <typename Value, size_t Size>
-Value Dot(const Vector<Value, Size>& a1, const Vector<Value, Size>& a2) {
+constexpr Value Dot(const Vector<Value, Size>& a1, const Vector<Value, Size>& a2) {
   Value result = static_cast<Value>(0);
   for (size_t i = 0; i < Size; i++) {
     result += a1[i] * a2[i];
@@ -192,7 +192,7 @@ Value Dot(const Vector<Value, Size>& a1, const Vector<Value, Size>& a2) {
   * @brief 向量的模的平方
   */
 template <typename Value, size_t Size>
-Value SquaredLength(const Vector<Value, Size>& a) {
+constexpr Value SquaredLength(const Vector<Value, Size>& a) {
   return Dot(a, a);
 }
 
@@ -216,7 +216,7 @@ Vector<Value, Size> Normalize(const Vector<Value, Size>& a) {
   * @brief 叉乘
   */
 template <typename Value>
-Vector<Value, 3> Cross(const Vector<Value, 3>& a, const Vector<Value, 3>& b) {
+constexpr Vector<Value, 3> Cross(const Vector<Value, 3>& a, const Vector<Value, 3>& b) {
   return Vector<Value, 3>(
       a.Y() * b.Z() - a.Z() * b.Y(),
       a.Z() * b.X() - a.X() * b.Z(),
@@ -251,7 +251,7 @@ Vector<Type, Size> Tan(const Vector<Type, Size>& vec) {
 }
 
 template <typename Type, size_t Size>
-Vector<Type, Size> Radian(const Vector<Type, Size>& vec) {
+constexpr Vector<Type, Size> Radian(const Vector<Type, Size>& vec) {
   Vector<Type, Size> result;
   for (size_t i = 0; i < Size; i++) {
     result[i] = Type(PI_VALUE) / Type(180) * vec[i];
@@ -260,7 +260,7 @@ Vector<Type, Size> Radian(const Vector<Type, Size>& vec) {
 }
 
 template <typename Type, size_t Size>
-Vector<Type, Size> Angle(const Vector<Type, Size>& vec) {
+constexpr Vector<Type, Size> Angle(const Vector<Type, Size>& vec) {
   Vector<Type, Size> result;
   for (size_t i = 0; i < Size; i++) {
     result[i] = Type(180) / Type(PI_VALUE) * vec[i];
@@ -284,9 +284,9 @@ struct Matrix {
     return identify;
   }
 
-  Matrix() noexcept = default;
+  constexpr Matrix() noexcept = default;
 
-  explicit Matrix(Type t) noexcept {
+  constexpr explicit Matrix(Type t) noexcept {
     for (size_t i = 0; i < Row; i++) {
       for (size_t j = 0; j < Column; j++) {
         m[i][j] = t;
@@ -295,7 +295,7 @@ struct Matrix {
   }
 
   template <size_t R, size_t C>
-  explicit Matrix(const Matrix<Type, R, C>& mat) {
+  constexpr explicit Matrix(const Matrix<Type, R, C>& mat) {
     for (size_t i = 0; i < Row; i++) {
       for (size_t j = 0; j < Column; j++) {
         if (i >= R || j >= C) {
@@ -308,7 +308,7 @@ struct Matrix {
   }
 
   template <typename... Param, std::enable_if_t<sizeof...(Param) == Row * Column, int> = 0>
-  Matrix(Param... params) noexcept {
+  constexpr Matrix(Param... params) noexcept {
     Type p[]{static_cast<Type>(params)...};
     for (size_t i = 0; i < Row; i++) {
       for (size_t j = 0; j < Column; j++) {
@@ -317,24 +317,24 @@ struct Matrix {
     }
   }
 
-  Type& At(size_t i, size_t j) {
+  constexpr Type& At(size_t i, size_t j) {
     assert(i < Row);
     assert(j < Column);
     return m[i][j];
   }
 
-  const Type& At(size_t i, size_t j) const {
+  constexpr const Type& At(size_t i, size_t j) const {
     assert(i < Row);
     assert(j < Column);
     return m[i][j];
   }
 
-  const Type* GetAddress() const {
+  constexpr const Type* GetAddress() const {
     return &m[0][0];
   }
 
   template <size_t RightRow, size_t RightColumn, std::enable_if_t<(Column == RightRow), int> = 0>
-  Matrix<Type, Row, RightColumn> operator*(const Matrix<Type, RightRow, RightColumn>& mat) const {
+  constexpr Matrix<Type, Row, RightColumn> operator*(const Matrix<Type, RightRow, RightColumn>& mat) const {
     Matrix<Type, Row, RightColumn> result;
     for (size_t i = 0; i < Row; i++) {
       for (size_t j = 0; j < RightColumn; j++) {
@@ -351,7 +351,7 @@ struct Matrix {
   }
 
   template <size_t Size, std::enable_if_t<(Size == Column), int> = 0>
-  Vector<Type, Row> operator*(const Vector<Type, Size>& vec) const {
+  constexpr Vector<Type, Row> operator*(const Vector<Type, Size>& vec) const {
     Vector<Type, Row> result;
     for (size_t i = 0; i < Row; i++) {
       Type t = static_cast<Type>(0);
@@ -386,14 +386,14 @@ struct Matrix {
   }
 
  private:
-  Type m[Row][Column];
+  Type m[Row][Column] = {};
 };
 
 /**
   * @brief 缩放矩阵
   */
 template <typename Value>
-Matrix<Value, 4, 4> Scale(const Vector<Value, 4>& v) {
+constexpr Matrix<Value, 4, 4> Scale(const Vector<Value, 4>& v) {
   Matrix<Value, 4, 4> result{};
   result.At(0, 0) = v[0];
   result.At(1, 1) = v[1];
@@ -406,7 +406,7 @@ Matrix<Value, 4, 4> Scale(const Vector<Value, 4>& v) {
   * @brief 缩放矩阵
   */
 template <typename Value>
-Matrix<Value, 4, 4> Scale(const Vector<Value, 3>& v) {
+constexpr Matrix<Value, 4, 4> Scale(const Vector<Value, 3>& v) {
   Matrix<Value, 4, 4> result{};
   result.At(0, 0) = v[0];
   result.At(1, 1) = v[1];
@@ -419,7 +419,7 @@ Matrix<Value, 4, 4> Scale(const Vector<Value, 3>& v) {
   * @brief 位移矩阵
   */
 template <typename Value>
-Matrix<Value, 4, 4> Translate(const Vector<Value, 3>& v) {
+constexpr Matrix<Value, 4, 4> Translate(const Vector<Value, 3>& v) {
   auto result = Matrix<Value, 4, 4>::Identity();
   result.At(3, 0) = v[0];
   result.At(3, 1) = v[1];
@@ -511,7 +511,7 @@ Matrix<Value, 4, 4> Perspective(Value fov, Value aspect, Value near, Value far) 
   * @brief 正交投影矩阵
   */
 template <typename Value>
-Matrix<Value, 4, 4> Ortho(Value left, Value right, Value bottom, Value top, Value near, Value far) {
+constexpr Matrix<Value, 4, 4> Ortho(Value left, Value right, Value bottom, Value top, Value near, Value far) {
   Value rl = static_cast<Value>(1.0) / (right - left);
   Value tb = static_cast<Value>(1.0) / (top - bottom);
   Value fn = static_cast<Value>(1.0) / (far - near);
@@ -562,7 +562,7 @@ Matrix<Value, 4, 4> LookAt(const Vector<Value, 3>& origin, const Vector<Value, 3
  * @brief 矩阵转置
 */
 template <typename Value, size_t Row, size_t Column>
-Matrix<Value, Column, Row> Transpose(const Matrix<Value, Row, Column>& mat) {
+constexpr Matrix<Value, Column, Row> Transpose(const Matrix<Value, Row, Column>& mat) {
   Matrix<Value, Column, Row> result;
   for (size_t i = 0; i < Row; i++) {
     for (size_t j = 0; j < Column; j++) {

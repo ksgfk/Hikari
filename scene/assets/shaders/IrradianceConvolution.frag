@@ -1,6 +1,6 @@
 #version 330 core
 
-#define PI 3.14159265359
+#include <Macros.glsl>
 
 #ifndef SAMPLE_STEP
 #define SAMPLE_STEP 0.01

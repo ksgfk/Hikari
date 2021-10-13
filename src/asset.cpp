@@ -412,8 +412,8 @@ ImmutableModel ImmutableModel::CreateCube(const std::string& name, float halfExt
        16, 17, 18, 16, 18, 19,
        20, 23, 22, 20, 22, 21};
 
-  const uint32_t numberVertices = 24;
-  const uint32_t numberIndices = 36;
+  constexpr const uint32_t numberVertices = 24;
+  constexpr const uint32_t numberIndices = 36;
 
   std::vector<Vector3f> vertices(numberVertices, Vector3f{});
   std::vector<Vector3f> normals(numberVertices, Vector3f{});
@@ -429,6 +429,44 @@ ImmutableModel ImmutableModel::CreateCube(const std::string& name, float halfExt
                     cubeTexCoords[i * 2 + 1]};
   }
   std::vector<size_t> indices(cubeIndices, cubeIndices + numberIndices);
+  return ImmutableModel(name, std::move(vertices), std::move(normals), std::move(texCoords), std::move(indices));
+}
+
+ImmutableModel ImmutableModel::CreateQuad(const std::string& name, float halfExtend) {
+  constexpr const float quadVertices[] = {
+      -1.0f, 1.0f, 0.0f,
+      -1.0f, -1.0f, 0.0f,
+      1.0f, 1.0f, 0.0f,
+      1.0f, -1.0f, 0.0f};
+  constexpr const float quadNormal[] = {
+      0.0f, 0.0f, -1.0f,
+      0.0f, 0.0f, -1.0f,
+      0.0f, 0.0f, -1.0f,
+      0.0f, 0.0f, -1.0f};
+  constexpr const float quadTex[] = {
+      0.0f, 1.0f,
+      0.0f, 0.0f,
+      1.0f, 1.0f,
+      1.0f, 0.0f};
+  constexpr const size_t quadIndices[] =
+      {0, 1, 2,
+       2, 1, 3};
+  constexpr const uint32_t numberVertices = 4;
+  constexpr const uint32_t numberIndices = 6;
+  std::vector<Vector3f> vertices(numberVertices, Vector3f{});
+  std::vector<Vector3f> normals(numberVertices, Vector3f{});
+  std::vector<Vector2f> texCoords(numberVertices, Vector2f{});
+  for (uint32_t i = 0; i < numberVertices; i++) {
+    vertices[i] = {quadVertices[i * 3 + 0] * halfExtend,
+                   quadVertices[i * 3 + 1] * halfExtend,
+                   quadVertices[i * 3 + 2] * halfExtend};
+    normals[i] = {quadNormal[i * 3 + 0],
+                  quadNormal[i * 3 + 1],
+                  quadNormal[i * 3 + 2]};
+    texCoords[i] = {quadTex[i * 2 + 0],
+                    quadTex[i * 2 + 1]};
+  }
+  std::vector<size_t> indices(quadIndices, quadIndices + numberIndices);
   return ImmutableModel(name, std::move(vertices), std::move(normals), std::move(texCoords), std::move(indices));
 }
 

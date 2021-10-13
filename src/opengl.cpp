@@ -1360,6 +1360,8 @@ GLint TextureOpenGL::MapPixelFormat(ImageDataFormat format) {
       return GL_RGBA;
     case ImageDataFormat::Depth:
       return GL_DEPTH_COMPONENT;
+    case ImageDataFormat::RG:
+      return GL_RG;
     default:
       throw OpenGLException("unknown ImageDataFormat");
   }

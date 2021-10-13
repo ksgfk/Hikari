@@ -444,10 +444,15 @@ enum class FilterMode {
 enum class ImageDataFormat {
   RGB,
   RGBA,
-  Depth
+  Depth,
+  RG
 };
 
 enum class PixelFormat : GLenum {
+  RG8 = GL_RG8,
+  RG16 = GL_RG16,
+  RG16F = GL_RG16F,
+  RG32F = GL_RG32F,
   RGB8 = GL_RGB8,
   RGBA8 = GL_RGBA8,
   RGB16F = GL_RGB16F,

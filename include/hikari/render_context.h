@@ -107,12 +107,18 @@ class RenderContextOpenGL {
                                                     BufferAccess access = BufferAccess::NoMap);
   std::shared_ptr<ProgramOpenGL> CreateShaderProgram(const std::string& vs, const std::string& fs,
                                                      const ShaderAttributeLayouts& desc);
+  std::shared_ptr<ProgramOpenGL> LoadShaderProgram(const std::filesystem::path& vsPath,
+                                                   const std::filesystem::path& fsPath,
+                                                   const std::filesystem::path& libPath,
+                                                   const ShaderAttributeLayouts& desc);
   std::shared_ptr<TextureOpenGL> CreateTexture2D(const Texture2dDescriptorOpenGL& desc);
   std::shared_ptr<TextureOpenGL> CreateCubeMap(const TextureCubeMapDescriptorOpenGL& desc);
   std::shared_ptr<TextureOpenGL> CreateDepthTexture(const DepthTextureDescriptorOpenGL& desc);
   std::shared_ptr<FrameBufferOpenGL> CreateFrameBuffer(const FrameBufferDepthDescriptor& desc);
   std::shared_ptr<FrameBufferOpenGL> CreateFrameBuffer(const FrameBufferRenderDescriptor& desc);
   std::shared_ptr<RenderBufferOpenGL> CreateRenderBuffer(const RenderBufferDescriptor& desc);
+  std::shared_ptr<BufferOpenGL> CreateCubeVbo(float halfExtend, int& vertexCnt);
+  std::shared_ptr<BufferOpenGL> CreateQuadVbo(float halfExtend, int& vertexCnt);
   /**
    * @brief 将等距柱状投影图转换为立方体图
   */
@@ -120,7 +126,6 @@ class RenderContextOpenGL {
       const Texture2dDescriptorOpenGL& tex2d,
       const TextureCubeMapDescriptorOpenGL& cubeConfig,
       const std::filesystem::path& shaderLib);
-
   /**
    * @brief 生成辐照度卷积
   */
@@ -128,7 +133,6 @@ class RenderContextOpenGL {
       const std::shared_ptr<TextureOpenGL>& irradiance,
       const TextureCubeMapDescriptorOpenGL& cubeConfig,
       const std::filesystem::path& shaderLib);
-
   /**
    * @brief 预滤波环境贴图
   */
@@ -136,6 +140,11 @@ class RenderContextOpenGL {
       const std::shared_ptr<TextureOpenGL>& env,
       const TextureCubeMapDescriptorOpenGL& config,
       const std::filesystem::path& shaderLib);
+  /**
+   * @brief 预计算BRDF查询表
+  */
+  std::shared_ptr<TextureOpenGL> PrecomputeBrdfLut(const Texture2dDescriptorOpenGL& desc,
+                                                   const std::filesystem::path& shaderLib);
   void AddUniformBlocks(const ProgramOpenGL& prog);
   void DestroyObject(const std::shared_ptr<ObjectOpenGL>& ptr);
   void DestroyObject(const std::shared_ptr<ProgramOpenGL>& ptr);
@@ -250,5 +259,6 @@ constexpr VertexBufferLayout GetVertexLayoutTexCoordPNT(int index) {
 }
 ShaderAttributeLayout POSITION0();
 ShaderAttributeLayout NORMAL0();
+ShaderAttributeLayout TEXCOORD0();
 
 }  // namespace Hikari
