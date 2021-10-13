@@ -2,7 +2,9 @@
 
 #define PI 3.14159265359
 
-const float sampleDelta = 0.01;
+#ifndef SAMPLE_STEP
+#define SAMPLE_STEP 0.01
+#endif
 
 out vec4 f_Color;
 
@@ -22,10 +24,10 @@ void main() {
   float nrSamples = 0.0;
   vec3 irradiance = vec3(0.0);
   //计算整个半球上的积分，均匀采样，sinTheta作为权重
-  for(float phi = 0.0; phi < 2.0 * PI; phi += sampleDelta) {
+  for(float phi = 0.0; phi < 2.0 * PI; phi += SAMPLE_STEP) {
     float cosPhi = cos(phi);
     float sinPhi = sin(phi);
-    for(float theta = 0.0; theta < 0.5 * PI; theta += sampleDelta) {
+    for(float theta = 0.0; theta < 0.5 * PI; theta += SAMPLE_STEP) {
       float cosTheta = cos(theta);
       float sinTheta = sin(theta);
       //球面坐标转换为直角坐标系

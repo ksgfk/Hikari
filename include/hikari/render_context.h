@@ -115,14 +115,26 @@ class RenderContextOpenGL {
   std::shared_ptr<RenderBufferOpenGL> CreateRenderBuffer(const RenderBufferDescriptor& desc);
   /**
    * @brief 将等距柱状投影图转换为立方体图
-   */
-  std::shared_ptr<TextureOpenGL> ConvertEquirectangularToCubemap(
+  */
+  std::shared_ptr<TextureOpenGL> ConvertSphericalToCubemap(
       const Texture2dDescriptorOpenGL& tex2d,
       const TextureCubeMapDescriptorOpenGL& cubeConfig,
       const std::filesystem::path& shaderLib);
+
+  /**
+   * @brief 生成辐照度卷积
+  */
   std::shared_ptr<TextureOpenGL> GenIrradianceConvolutionCubemap(
       const std::shared_ptr<TextureOpenGL>& irradiance,
       const TextureCubeMapDescriptorOpenGL& cubeConfig,
+      const std::filesystem::path& shaderLib);
+
+  /**
+   * @brief 预滤波环境贴图
+  */
+  std::shared_ptr<TextureOpenGL> PrefilterEnvMap(
+      const std::shared_ptr<TextureOpenGL>& env,
+      const TextureCubeMapDescriptorOpenGL& config,
       const std::filesystem::path& shaderLib);
   void AddUniformBlocks(const ProgramOpenGL& prog);
   void DestroyObject(const std::shared_ptr<ObjectOpenGL>& ptr);

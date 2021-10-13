@@ -133,7 +133,7 @@ class SkyboxPass : public RenderPass {
       dyMapDesc.DataPtr[i] = nullptr;
     }
     std::cout << "converting pillars_4k.hdr to cube map...";
-    _skybox = GetContext().ConvertEquirectangularToCubemap(hdrDesc, dyMapDesc, GetApp().GetShaderLibPath());
+    _skybox = GetContext().ConvertSphericalToCubemap(hdrDesc, dyMapDesc, GetApp().GetShaderLibPath());
     std::cout << "Done." << std::endl;
 
     TextureCubeMapDescriptorOpenGL convDesc;

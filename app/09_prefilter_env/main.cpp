@@ -19,15 +19,24 @@ class Cube : public GameObject {
 class Sphere : public GameObject {
  public:
   Sphere() : GameObject("sphere") {}
-  void OnStart() override {
-    ImmutableModel sphereModel = ImmutableModel::CreateSphere("sphere", 1, 32);
-    CreateVboIbo(sphereModel, Vbo, Ibo);
-    IndexCount = int(sphereModel.GetIndexCount());
+  Sphere(int i, const Vector3f& pos) : GameObject(std::string("sphere") + std::to_string(i)) {
+    GetTransform().Position = pos;
   }
-  std::shared_ptr<BufferOpenGL> Vbo;
-  std::shared_ptr<BufferOpenGL> Ibo;
-  int IndexCount{};
+  void OnStart() override {
+    if (IndexCount == 0) {
+      ImmutableModel sphereModel = ImmutableModel::CreateSphere("sphere", 0.4f, 32);
+      CreateVboIbo(sphereModel, Vbo, Ibo);
+      IndexCount = int(sphereModel.GetIndexCount());
+    }
+  }
+  static std::shared_ptr<BufferOpenGL> Vbo;
+  static std::shared_ptr<BufferOpenGL> Ibo;
+  static int IndexCount;
 };
+
+std::shared_ptr<BufferOpenGL> Sphere::Vbo;
+std::shared_ptr<BufferOpenGL> Sphere::Ibo;
+int Sphere::IndexCount = 0;
 
 class ClearPass : public RenderPass {
  public:
@@ -42,26 +51,32 @@ class ColorPass : public RenderPass {
   ColorPass() : RenderPass("Color Pass", 1) {}
 
   void OnStart() override {
-    LoadProgram("texture.vert", "texture.frag", {POSITION0()});
+    LoadProgram("texture.vert", "texture.frag", {POSITION0(), NORMAL0()});
   }
 
   void OnPostStart() override {
     convSky = GetApp().GetSharedObject<std::shared_ptr<TextureOpenGL>>("convSkyBox");
-    _sphere = GetApp().GetGameObject<Sphere>("sphere");
+    for (int i = 0; i < 5; i++) {
+      sphere[i] = GetApp().GetGameObject<Sphere>(std::string("sphere") + std::to_string(i));
+    }
   }
 
   void OnUpdate() override {
     ActivePipelineConfig();
     ActiveProgram();
     SetViewportFullFrameBuffer();
-    SetModelMatrix(*_sphere);
-    GetProgram()->UniformCubeMap("u_cube", BindTexture(*convSky));
-    SetVertexBuffer(_sphere->Vbo, GetVertexLayoutPositionPNT());
-    SetIndexBuffer(_sphere->Ibo);
-    DrawIndexed(_sphere->IndexCount, 0);
+    for (int i = 0; i < 5; i++) {
+      SetModelMatrix(*sphere[i]);
+      GetProgram()->UniformCubeMap("u_cube", BindTexture(*convSky));
+      GetProgram()->UniformInt("u_roughness", i);
+      SetVertexBuffer(sphere[i]->Vbo, GetVertexLayoutPositionPNT());
+      SetVertexBuffer(sphere[i]->Vbo, GetVertexLayoutNormalPNT());
+      SetIndexBuffer(sphere[i]->Ibo);
+      DrawIndexed(sphere[i]->IndexCount, 0);
+    }
   }
 
-  std::shared_ptr<Sphere> _sphere;
+  std::shared_ptr<Sphere> sphere[5];
   std::shared_ptr<TextureOpenGL> convSky;
 };
 
@@ -103,19 +118,16 @@ class SkyboxPass : public RenderPass {
 
     TextureCubeMapDescriptorOpenGL convDesc;
     convDesc.Wrap = WrapMode::Clamp;
-    convDesc.MinFilter = FilterMode::Bilinear;
-    convDesc.MagFilter = FilterMode::Bilinear;
-    convDesc.MipMapLevel = 0;
     convDesc.TextureFormat = PixelFormat::RGB32F;
-    convDesc.Width = 64;
-    convDesc.Height = 64;
+    convDesc.Width = 512;
+    convDesc.Height = 512;
     for (int i = 0; i < 6; i++) {
       convDesc.DataFormat[i] = ImageDataFormat::RGB;
       convDesc.DataType[i] = ImageDataType::Float32;
       convDesc.DataPtr[i] = nullptr;
     }
-    std::cout << "generating irradiance convolution for pillars_4k.hdr...";
-    _conv = GetContext().GenIrradianceConvolutionCubemap(_skybox, convDesc, GetApp().GetShaderLibPath());
+    std::cout << "prefilter pillars_4k.hdr...";
+    _conv = GetContext().PrefilterEnvMap(_skybox, convDesc, GetApp().GetShaderLibPath());
     std::cout << "Done." << std::endl;
 
     LoadProgram("skybox.vert", "skybox.frag", {POSITION0()});
@@ -148,13 +160,15 @@ class SkyboxPass : public RenderPass {
 int main(int argc, char** argv) {
   auto& app = Application::GetInstance();
   app.SetWindowCreateInfo({"Hikari Irradiance Convolution"});
-  app.SetRenderContextCreateInfo({3, 3});
+  app.SetRenderContextCreateInfo({4, 6});
   app.ParseArgs(argc, argv);
   app.CreatePass<ClearPass>();
   app.CreatePass<SkyboxPass>();
   app.CreatePass<ColorPass>();
   app.Instantiate<Cube>();
-  app.Instantiate<Sphere>();
+  for (int i = 0; i < 5; i++) {
+    app.Instantiate<Sphere>(i, Vector3f{i - 2, 0, 0});
+  }
   app.CreateCamera<PerspectiveCamera>();
   app.GetCamera().CanOrbitCtrl = true;
   app.Awake();

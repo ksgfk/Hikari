@@ -45,6 +45,14 @@ Linux Ubuntu下，Clang10编译运行通过，GCC没试（懒
 src/application.cpp文件里，`ParseArgs`函数里列出了所有支持的命令行参数
 
 ## Show 结果展示
+### 9.Prefilter Environment Map
+
+<img src="show/9-prefilter_env.png" alt="9-prefilter_env.png" width="50%">
+
+**注意：** 需要加载资源
+
+使用Split-Sum Approximate将渲染方程拆成了两部分，第一部分是环境光在半球上的积分，这部分可以预计算。我们知道法线分布函数的lobe随着粗糙度变大而变大，也就是需要采样更大范围的环境光。mipmap就很适合来储存这样的环境光贴图，mipmap level表示粗糙度，各个level间还可以插值。
+
 ### 8.Diffuse Irradiance
 
 <img src="show/8-diffuse_irradiance.png" alt="8-diffuse_irradiance.png" width="50%">
