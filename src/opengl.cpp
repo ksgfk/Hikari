@@ -435,19 +435,19 @@ ShaderAttributeLayout::ShaderAttributeLayout(const std::string& name,
 }
 
 bool ShaderUniformBlock::Member::operator==(const ShaderUniformBlock::Member& o) const {
-  return Name == o.Name && Location == o.Location && Type == o.Type && Length == o.Length && Offset == o.Offset && Align == o.Align;
+  return Name == o.Name && Type == o.Type && Length == o.Length && Offset == o.Offset && Align == o.Align;
 }
 
 bool ShaderUniformBlock::Member::operator!=(const ShaderUniformBlock::Member& o) const {
-  return Name != o.Name || Location != o.Location || Type != o.Type || Length != o.Length || Offset != o.Offset || Align != o.Align;
+  return Name != o.Name || Type != o.Type || Length != o.Length || Offset != o.Offset || Align != o.Align;
 }
 
 bool ShaderUniformBlock::operator==(const ShaderUniformBlock& o) const {
-  return Name == o.Name && Index == o.Index && DataSize == o.DataSize && Members == o.Members;
+  return Name == o.Name && DataSize == o.DataSize && Members == o.Members;
 }
 
 bool ShaderUniformBlock::operator!=(const ShaderUniformBlock& o) const {
-  return Name != o.Name || Index != o.Index || DataSize != o.DataSize || Members != o.Members;
+  return Name != o.Name || DataSize != o.DataSize || Members != o.Members;
 }
 
 ProgramOpenGL::ProgramOpenGL() noexcept = default;

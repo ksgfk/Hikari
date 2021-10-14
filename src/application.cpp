@@ -121,7 +121,7 @@ void GameObject::CreateVbo(const ImmutableModel& model, std::shared_ptr<BufferOp
   auto d = GenVboDataPNT(model.GetPosition(), model.GetNormals(), model.GetTexCoords(), model.GetIndices());
   auto data = d.data();
   auto size = d.size() * sizeof(decltype(d)::value_type);
-  vbo = GetApp().GetContext().CreateVertexBuffer(data, size);
+  vbo = Application::GetInstance().GetContext().CreateVertexBuffer(data, size);
 }
 
 void GameObject::CreateVboIbo(const ImmutableModel& model,
@@ -129,7 +129,7 @@ void GameObject::CreateVboIbo(const ImmutableModel& model,
   auto vertex = GenVboDataPNT(model.GetPosition(), model.GetNormals(), model.GetTexCoords());
   auto vertexData = vertex.data();
   auto vertexSize = vertex.size() * sizeof(decltype(vertex)::value_type);
-  vbo = GetApp().GetContext().CreateVertexBuffer(vertexData, vertexSize);
+  vbo = Application::GetInstance().GetContext().CreateVertexBuffer(vertexData, vertexSize);
   std::vector<uint32_t> indices(model.GetIndexCount());
   for (size_t i = 0; i < model.GetIndexCount(); i++) {
     if (model.GetIndices()[i] >= std::numeric_limits<uint32_t>::max()) {
@@ -139,7 +139,7 @@ void GameObject::CreateVboIbo(const ImmutableModel& model,
   }
   auto indexData = indices.data();
   auto indexSize = indices.size() * sizeof(decltype(indices)::value_type);
-  ibo = GetApp().GetContext().CreateIndexBuffer(indexData, indexSize);
+  ibo = Application::GetInstance().GetContext().CreateIndexBuffer(indexData, indexSize);
 }
 
 MainCamera::MainCamera() : GameObject("Main Camera") {}
@@ -260,6 +260,59 @@ void LightCollection::Clear() {
   _dirDirectionData.clear();
   _pointRadianceData.clear();
   _pointDirectionData.clear();
+}
+
+Renderable::Renderable() noexcept = default;
+
+Renderable::~Renderable() = default;
+
+bool Renderable::HasIbo() const { return _ibo != nullptr; }
+
+void Renderable::Draw(RenderPass& pass) const {
+  if (HasIbo()) {
+    pass.DrawIndexed(GetDrawCount(), 0);
+  } else {
+    pass.Draw(GetDrawCount(), 0);
+  }
+}
+
+void Renderable::CreateVbo(const ImmutableModel& model) {
+  _drawCount = int(model.GetIndexCount());
+  GameObject::CreateVbo(model, _vbo);
+}
+
+void Renderable::CreateVboIbo(const ImmutableModel& model) {
+  _drawCount = int(model.GetIndexCount());
+  GameObject::CreateVboIbo(model, _vbo, _ibo);
+}
+
+RenderableCube::RenderableCube(float halfExtend) noexcept : Renderable(), _halfExtend(halfExtend) {}
+
+void RenderableCube::OnCreate() { CreateVbo(ImmutableModel::CreateCube("cube", _halfExtend)); }
+
+RenderableSphere::RenderableSphere(float radius, int numberSlices) noexcept
+    : Renderable(), _radius(radius), _slice(numberSlices) {}
+
+void RenderableSphere::OnCreate() { CreateVboIbo(ImmutableModel::CreateSphere("sphere", _radius, _slice)); }
+
+RenderableQuad::RenderableQuad(float halfExtend) noexcept : Renderable(), _halfExtend(halfExtend) {}
+
+void RenderableQuad::OnCreate() { CreateVbo(ImmutableModel::CreateQuad("quad", _halfExtend)); }
+
+RenderableSimple::RenderableSimple(std::function<ImmutableModel(Renderable&)> onCreate) : Renderable() {
+  _onCreate = std::move(onCreate);
+}
+
+void RenderableSimple::OnCreate() {
+  if (_onCreate) {
+    auto model = _onCreate(*this);
+    if (model.GetIndexCount() < 16) {
+      CreateVbo(model);
+    } else {
+      CreateVboIbo(model);
+    }
+  }
+  _onCreate = nullptr;
 }
 
 IRenderPass::~IRenderPass() noexcept = default;
@@ -459,6 +512,9 @@ void Application::Awake() {
   if (_camera->Camera == nullptr) {
     _camera->Camera = std::make_unique<PerspectiveCamera>();  //假装是透视相机
   }
+  for (auto& mesh : _renderables) {
+    mesh.second->OnCreate();
+  }
   for (auto& gameObject : _gameObjects) {
     gameObject->OnStart();
   }
@@ -505,6 +561,7 @@ void Application::Run() {
 
 void Application::Destroy() {
   _shared.clear();
+  _renderables.clear();
   _camera = nullptr;
   _lights.Clear();
   _gameObjects.clear();
@@ -599,6 +656,14 @@ void Application::ParseArgs(int argc, char** argv) {
   }
 }
 
+void Application::AddRenderable(const std::string& name, const std::shared_ptr<Renderable>& renderable) {
+  if (_renderables.find(name) == _renderables.end()) {
+    _renderables.emplace(name, renderable);
+  } else {
+    throw AppRuntimeException("render pass name must be unique");
+  }
+}
+
 const std::filesystem::path& Application::GetAssetPath() const { return _assetRoot; }
 
 const std::filesystem::path& Application::GetShaderLibPath() const { return _shaderLibRoot; }
@@ -614,6 +679,8 @@ std::any& Application::GetSharedObject(const std::string& name) {
 bool Application::HasSharedObject(const std::string& name) {
   return _shared.find(name) != _shared.end();
 }
+
+std::shared_ptr<Renderable> Application::GetRenderable(const std::string& name) { return _renderables.at(name); }
 
 void Application::SetSharedObject(const std::string& name, std::any&& obj) {
   _shared[name] = std::move(obj);

@@ -19,6 +19,7 @@
 namespace Hikari {
 
 class Application;
+class RenderPass;
 
 struct Transform {
   Vector3f Position{0};
@@ -50,9 +51,11 @@ class GameObject {
   Application& GetApp();
   RenderContextOpenGL& GetContext();
 
-  void CreateVbo(const ImmutableModel& model, std::shared_ptr<BufferOpenGL>& vbo);
-  void CreateVboIbo(const ImmutableModel& model,
-                    std::shared_ptr<BufferOpenGL>& vbo, std::shared_ptr<BufferOpenGL>& ibo);
+  static void CreateVbo(const ImmutableModel& model, std::shared_ptr<BufferOpenGL>& vbo);
+  static void CreateVboIbo(
+      const ImmutableModel& model,
+      std::shared_ptr<BufferOpenGL>& vbo,
+      std::shared_ptr<BufferOpenGL>& ibo);
 
  private:
   std::string _name;
@@ -113,6 +116,75 @@ class LightCollection {  //TODO:编译shader时把MAX_LIGHT_COUNT宏传进去
   std::vector<Vec3Align16> _dirDirectionData;
   std::vector<Vec3Align16> _pointRadianceData;
   std::vector<Vec3Align16> _pointDirectionData;
+};
+
+//其实是GPU Buffer管理类（
+class Renderable {
+ public:
+  Renderable() noexcept;
+  virtual ~Renderable();
+
+  virtual void OnCreate() = 0;
+
+  const std::shared_ptr<BufferOpenGL>& GetVbo() const { return _vbo; }
+  const std::shared_ptr<BufferOpenGL>& GetIbo() const { return _ibo; }
+  int GetDrawCount() const { return _drawCount; }
+  bool HasIbo() const;
+  void Draw(RenderPass& pass) const;
+
+ protected:
+  void CreateVbo(const ImmutableModel& model);
+  void CreateVboIbo(const ImmutableModel& model);
+
+ private:
+  std::shared_ptr<BufferOpenGL> _vbo;
+  std::shared_ptr<BufferOpenGL> _ibo;
+  int _drawCount{};
+};
+
+class RenderableCube : public Renderable {
+ public:
+  RenderableCube(float halfExtend) noexcept;
+  ~RenderableCube() override = default;
+
+  void OnCreate() override;
+
+ private:
+  float _halfExtend;
+};
+
+class RenderableSphere : public Renderable {
+ public:
+  RenderableSphere(float radius, int numberSlices) noexcept;
+  ~RenderableSphere() override = default;
+
+  void OnCreate() override;
+
+ private:
+  float _radius;
+  int _slice;
+};
+
+class RenderableQuad : public Renderable {
+ public:
+  RenderableQuad(float halfExtend) noexcept;
+  ~RenderableQuad() override = default;
+
+  void OnCreate() override;
+
+ private:
+  float _halfExtend;
+};
+
+class RenderableSimple : public Renderable {
+ public:
+  RenderableSimple(std::function<ImmutableModel(Renderable&)> onCreate);
+  ~RenderableSimple() override = default;
+
+  void OnCreate() final;
+
+ private:
+  std::function<ImmutableModel(Renderable&)> _onCreate;
 };
 
 class IRenderPass {
@@ -201,6 +273,7 @@ class Application {
   std::shared_ptr<GameObject> GetGameObject(const std::string& name);
   std::any& GetSharedObject(const std::string& name);
   bool HasSharedObject(const std::string& name);
+  std::shared_ptr<Renderable> GetRenderable(const std::string& name);
   float GetDeltaTime();
   float GetTime();
   float GetFps();
@@ -213,6 +286,7 @@ class Application {
   void SetAssetPath(const std::filesystem::path&);
   void SetShaderLibPath(const std::filesystem::path&);
   void ParseArgs(int argc, char** argv);
+  void AddRenderable(const std::string& name, const std::shared_ptr<Renderable>& renderable);
 
   template <class PassType, class... Args>
   void CreatePass(Args&&... args) {
@@ -233,6 +307,11 @@ class Application {
   void CreateCamera(Args&&... args) {
     static_assert(std::is_base_of<Camera, CameraType>::value, "CameraType must be a subclass of Camera");
     SetCamera(std::make_unique<CameraType>(std::forward<Args>(args)...));
+  }
+  template <class RenderableType, class... Args>
+  void CreateRenderable(const std::string& name, Args&&... args) {
+    static_assert(std::is_base_of<Renderable, RenderableType>::value, "RenderableType must be a subclass of Renderable");
+    AddRenderable(name, std::make_shared<RenderableType>(std::forward<Args>(args)...));
   }
   template <class ObjectType>
   std::shared_ptr<ObjectType> GetGameObject(const std::string& name) {
@@ -265,6 +344,7 @@ class Application {
   std::vector<std::shared_ptr<IRenderPass>> _renderPasses;
   std::unordered_map<std::string, std::shared_ptr<IRenderPass>> _renderPassNameDict;
   std::unordered_map<std::string, std::any> _shared;
+  std::unordered_map<std::string, std::shared_ptr<Renderable>> _renderables;
   int64_t _time{};
   int64_t _deltaTime{};
   std::chrono::time_point<std::chrono::high_resolution_clock> _lastFrameTime{};

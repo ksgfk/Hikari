@@ -40,11 +40,19 @@ Linux Ubuntu下，Clang10编译运行通过，GCC没试（懒
 
 如果使用在linux使用clang编译还需要安装`libc++-dev`和`libc++abi-dev`
 
-**注意：** 有些app必须输入资源文件的根目录，例如`app.exe -A assetPath`。路径有误的话，可能会直接crash（
+**注意：** 有些app必须输入资源文件的根目录，例如`app.exe -A "<工程根目录>/scene/assets"`。路径有误的话，可能会直接crash（
 
-src/application.cpp文件里，`ParseArgs`函数里列出了所有支持的命令行参数
+`src/application.cpp`文件里，`ParseArgs`函数里列出了所有支持的命令行参数
 
 ## Show 结果展示
+### 11.PBR Environment
+
+<img src="show/11-pbr_env.png" alt="11-pbr_env.png" width="50%">
+
+直接光照+IBL环境光=基于物理的渲染！（还差个相机...）
+
+PBR的高楼已经建成了，但是上面还飘着朵乌云...（老问题，左上角高粗糙度下的金属球太暗了）
+
 ### 10.BRDF Lut
 
 <img src="show/10-brdf_lut.png" alt="10-brdf_lut.png" width="50%">

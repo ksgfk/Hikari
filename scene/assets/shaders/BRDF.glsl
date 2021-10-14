@@ -9,6 +9,7 @@ struct MetallicWorkflowMaterial {
   float Roughness;
 };
 
+//GGX法线分布
 float DistributionGGX(vec3 N, vec3 H, float roughness) {
   float a = roughness * roughness;
   float a2 = a * a;
@@ -18,6 +19,7 @@ float DistributionGGX(vec3 N, vec3 H, float roughness) {
   return a2 / (PI * b * b);
 }
 
+//G1 GGX几何遮蔽Schlick近似
 float GeometrySchlickGGX(float NdotV, float roughness) {
   NdotV = clamp(NdotV, 0.0, 1.0);
   float x = (roughness + 1.0);
@@ -25,13 +27,7 @@ float GeometrySchlickGGX(float NdotV, float roughness) {
   return NdotV / (NdotV * (1.0 - k) + k);
 }
 
-float GeometrySchlickGGX_IBL(float NdotV, float roughness) {
-  NdotV = clamp(NdotV, 0.0, 1.0);
-  float a = roughness;
-  float k = (a * a) / 2.0;
-  return NdotV / (NdotV * (1.0 - k) + k);
-}
-
+//GGX几何遮蔽
 float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
   float nDotL = clamp(dot(N, L), 0.0, 1.0);
   float nDotV = clamp(dot(N, V), 0.0, 1.0);
@@ -40,14 +36,7 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
   return g1 * g2;
 }
 
-float GeometrySmith_IBL(vec3 N, vec3 V, vec3 L, float roughness) {
-  float nDotL = clamp(dot(N, L), 0.0, 1.0);
-  float nDotV = clamp(dot(N, V), 0.0, 1.0);
-  float g1 = GeometrySchlickGGX_IBL(nDotL, roughness);
-  float g2 = GeometrySchlickGGX_IBL(nDotV, roughness);
-  return g1 * g2;
-}
-
+//菲涅尔项，Schlick近似
 vec3 FresnelSchlick(vec3 F0, vec3 V, vec3 H) {
   float theta = dot(V, H);
   theta = clamp(theta, 0.0, 1.0);
@@ -56,6 +45,7 @@ vec3 FresnelSchlick(vec3 F0, vec3 V, vec3 H) {
   return F0 + (1.0 - F0) * b5;
 }
 
+//菲涅尔项，Schlick近似
 vec3 FresnelSchlickRoughness(vec3 F0, vec3 V, vec3 H, float roughness) {
   float theta = dot(V, H);
   theta = clamp(theta, 0.0, 1.0);
@@ -79,31 +69,68 @@ vec2 Hammersley(uint i, uint N) {
 // GGX重要性采样
 vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness) {
   float a = roughness * roughness;
-  // 球面坐标
-  //float thetaM = atan(a * sqrt(Xi.x) / sqrt(1 - Xi.x));
-  //float phiH = 2 * PI * Xi.y;
+  //https://google.github.io/filament/Filament.html#toc9.3
   float phi = 2.0 * PI * Xi.x;
   float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (a * a - 1.0) * Xi.y));
   float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
-  // 转换到直角坐标系
-  //vec3 wi = vec3(sin(thetaM) * cos(phiH), sin(thetaM) * sin(phiH), cos(thetaM));
+
   vec3 H;
   H.x = cos(phi) * sinTheta;
   H.y = sin(phi) * sinTheta;
   H.z = cosTheta;
-  // 构造切线空间
-  //float invLen = 1.0f / sqrt(N.x * N.x + N.z * N.z);
-  //vec3 T = vec3(N.z * invLen, 0.0f, -N.x * invLen);
-  //vec3 B = cross(T, N);
+
   vec3 up = abs(N.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
   vec3 tangent = normalize(cross(up, N));
   vec3 bitangent = cross(N, tangent);
-  // 转换到世界空间
-  //vec3 dir = vec3(dot(B, wi), dot(T, wi), dot(N, wi));
+
   vec3 sampleVec = tangent * H.x + bitangent * H.y + N * H.z;
-  //return normalize(dir);
   return normalize(sampleVec);
 }
+
+//---------------https://google.github.io/filament/Filament.html#listing_glslbrdf----------------
+float D_GGX(float NoH, float a) {
+  float a2 = a * a;
+  float f = (NoH * a2 - NoH) * NoH + 1.0;
+  return a2 / (PI * f * f);
+}
+
+vec3 F_Schlick(float u, vec3 f0) {
+  return f0 + (vec3(1.0) - f0) * pow(1.0 - u, 5.0);
+}
+
+float V_SmithGGXCorrelated(float NoV, float NoL, float a) {
+  float a2 = a * a;
+  float GGXL = NoV * sqrt((-NoL * a2 + NoL) * NoL + a2);
+  float GGXV = NoL * sqrt((-NoV * a2 + NoV) * NoV + a2);
+  return 0.5 / (GGXV + GGXL);
+}
+
+float Fd_Lambert() {
+  return INV_PI;
+}
+
+vec3 Cook_Torrance(vec3 v, vec3 l, vec3 n, vec3 f0, float rough, vec3 albedo, float metallic) {
+  vec3 h = normalize(v + l);
+  float NoV = abs(dot(n, v)) + 1e-5;
+  float NoL = clamp(dot(n, l), 0.0, 1.0);
+  float NoH = clamp(dot(n, h), 0.0, 1.0);
+  float LoH = clamp(dot(l, h), 0.0, 1.0);
+
+  float roughness = rough * rough;
+
+  float D = D_GGX(NoH, roughness);
+  vec3  F = F_Schlick(LoH, f0);
+  float V = V_SmithGGXCorrelated(NoV, NoL, roughness);
+
+  vec3 Fr = (D * V) * F;
+
+  vec3 ks = F;
+  vec3 kd = (vec3(1.0) - ks) * (1.0 - metallic);
+  vec3 Fd = kd * albedo * Fd_Lambert();
+
+  return (Fr + Fd) * NoL;
+}
+//-----------------------------------------------------------------------------------------------
 
 struct BlinnPhongMaterial {
   vec3 kd;
@@ -112,6 +139,7 @@ struct BlinnPhongMaterial {
 };
 
 /**
+ * Diffuse漫反射+BlinnPhong高光
  * norm:法线方向
  * LiDir:光源方向
  * LiRad:光源radiance

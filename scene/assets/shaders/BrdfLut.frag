@@ -10,6 +10,26 @@ out vec2 FragColor;
 
 in vec2 v_TexCoord;
 
+float _GeometrySchlickGGX(float NdotV, float roughness) {
+  // note that we use a different k for IBL
+  float a = roughness;
+  float k = (a * a) / 2.0;
+
+  float nom = NdotV;
+  float denom = NdotV * (1.0 - k) + k;
+
+  return nom / denom;
+}
+
+float _GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
+  float NdotV = max(dot(N, V), 0.0);
+  float NdotL = max(dot(N, L), 0.0);
+  float ggx2 = _GeometrySchlickGGX(NdotV, roughness);
+  float ggx1 = _GeometrySchlickGGX(NdotL, roughness);
+
+  return ggx1 * ggx2;
+}
+
 vec2 IntegrateBRDF(float NdotV, float roughness) {
   vec3 V;
   V.x = sqrt(1.0 - NdotV*NdotV);
@@ -31,7 +51,7 @@ vec2 IntegrateBRDF(float NdotV, float roughness) {
     float VdotH = max(dot(V, H), 0.0);
 
     if(NdotL > 0.0) {
-      float G = GeometrySmith_IBL(N, V, L, roughness);
+      float G = _GeometrySmith(N, V, L, roughness);
       float G_Vis = (G * VdotH) / (NdotH * NdotV);
       float Fc = pow(1.0 - VdotH, 5.0);
 
