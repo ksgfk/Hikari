@@ -54,4 +54,5 @@ cmake-build-debug
 cmake-build-release
 
 # this model is too big...
-scene/assets/ajax.obj          
+scene/assets/ajax.obj
+scene/assets/copper-rock1-bl

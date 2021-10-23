@@ -44,6 +44,10 @@ Linux Ubuntu下，Clang10编译运行通过，GCC没试（懒
 
 `src/application.cpp`文件里，`ParseArgs`函数里列出了所有支持的命令行参数
 
+**注意：**有些资源的作者不允许再次分发，所以没有传到git上。这些资源需要自行下载并放入对应文件夹
+
+* `scene\assets\copper-rock1-bl`：[copper-rock1-bl.zip](https://freepbr.com/wp-content/uploads/bl/copper-rock1-bl.zip)
+
 ## Show 结果展示
 ### 13.Normal Map
 
