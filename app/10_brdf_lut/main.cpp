@@ -21,7 +21,7 @@ class ColorPass : public RenderPass {
   ColorPass() : RenderPass("Color Pass", 0) {}
 
   void OnStart() override {
-    LoadProgram("texture.vert", "texture.frag", {POSITION0(), TEXCOORD0()});
+    LoadProgram("texture.vert", "texture.frag", {POSITION(), TEXCOORD0()});
 
     Texture2dDescriptorOpenGL lutDesc;
     lutDesc.Wrap = WrapMode::Clamp;
@@ -49,8 +49,8 @@ class ColorPass : public RenderPass {
     SetViewportFullFrameBuffer();
     SetModelMatrix(*quad);
     GetProgram()->UniformTexture2D("u_texture", BindTexture(*lut));
-    SetVertexBuffer(quad->Vbo, GetVertexLayoutPositionPNT());
-    SetVertexBuffer(quad->Vbo, GetVertexLayoutTexCoordPNT(0));
+    SetVertexBuffer(quad->Vbo, GetVertexPosPNT());
+    SetVertexBuffer(quad->Vbo, GetVertexTexPNT(0));
     Draw(quad->VertexCount, 0);
   }
 

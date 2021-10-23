@@ -16,6 +16,8 @@
 namespace Hikari {
 class RenderPass;
 class RenderContextOpenGL;
+struct VertexPNT;
+struct VertexPTNT;
 
 class RenderContextException : public std::runtime_error {
  public:
@@ -112,6 +114,7 @@ class RenderContextOpenGL {
                                                    const std::filesystem::path& libPath,
                                                    const ShaderAttributeLayouts& desc);
   std::shared_ptr<TextureOpenGL> CreateTexture2D(const Texture2dDescriptorOpenGL& desc);
+  std::shared_ptr<TextureOpenGL> LoadBitmap2D(std::filesystem::path, WrapMode, FilterMode, PixelFormat);
   std::shared_ptr<TextureOpenGL> CreateCubeMap(const TextureCubeMapDescriptorOpenGL& desc);
   std::shared_ptr<TextureOpenGL> CreateDepthTexture(const DepthTextureDescriptorOpenGL& desc);
   std::shared_ptr<FrameBufferOpenGL> CreateFrameBuffer(const FrameBufferDepthDescriptor& desc);
@@ -119,6 +122,8 @@ class RenderContextOpenGL {
   std::shared_ptr<RenderBufferOpenGL> CreateRenderBuffer(const RenderBufferDescriptor& desc);
   std::shared_ptr<BufferOpenGL> CreateCubeVbo(float halfExtend, int& vertexCnt);
   std::shared_ptr<BufferOpenGL> CreateQuadVbo(float halfExtend, int& vertexCnt);
+  std::shared_ptr<BufferOpenGL> CreateVbo(const std::vector<VertexPNT>& pnt);
+  std::shared_ptr<BufferOpenGL> CreateVbo(const std::vector<VertexPTNT>& ptnt);
   /**
    * @brief 将等距柱状投影图转换为立方体图
   */
@@ -145,6 +150,12 @@ class RenderContextOpenGL {
   */
   std::shared_ptr<TextureOpenGL> PrecomputeBrdfLut(const Texture2dDescriptorOpenGL& desc,
                                                    const std::filesystem::path& shaderLib);
+  /**
+   * @brief 预计算多次散射BRDF查询表
+  */
+  std::shared_ptr<TextureOpenGL> PrecomputerBrdfMultiScatteringLut(
+      const Texture2dDescriptorOpenGL& desc,
+      const std::filesystem::path& shaderLib);
   void AddUniformBlocks(const ProgramOpenGL& prog);
   void DestroyObject(const std::shared_ptr<ObjectOpenGL>& ptr);
   void DestroyObject(const std::shared_ptr<ProgramOpenGL>& ptr);
@@ -235,30 +246,61 @@ constexpr const char* UNIFORM_LIGHT_POINT_DIR = "u_LightPositionPoint";
 constexpr const char* UNIFORM_LIGHT_POINT_CNT = "u_LightPointCount";
 
 //在buffer中排列：PNTPNTPNT
-struct VertexPositionNormalTexCoord {
+struct VertexPNT {
   Vector3f Position;
   Vector3f Normal;
   Vector2f TexCoord;
 };
-constexpr int SizePNT() { return static_cast<int>(sizeof(VertexPositionNormalTexCoord)); }
-std::vector<VertexPositionNormalTexCoord> GenVboDataPNT(const std::vector<Vector3f>& pos,
-                                                        const std::vector<Vector3f>& normal,
-                                                        const std::vector<Vector2f>& tex);
-std::vector<VertexPositionNormalTexCoord> GenVboDataPNT(const std::vector<Vector3f>& pos,
-                                                        const std::vector<Vector3f>& normal,
-                                                        const std::vector<Vector2f>& tex,
-                                                        const std::vector<size_t>& idx);
-constexpr VertexBufferLayout GetVertexLayoutPositionPNT() {
-  return VertexBufferLayout({SemanticType::Vertex, 0}, SizePNT(), offsetof(VertexPositionNormalTexCoord, Position));
+constexpr int SizePNT() { return static_cast<int>(sizeof(VertexPNT)); }
+std::vector<VertexPNT> GenVboDataPNT(const std::vector<Vector3f>& pos,
+                                     const std::vector<Vector3f>& normal,
+                                     const std::vector<Vector2f>& tex);
+std::vector<VertexPNT> GenVboDataPNT(const std::vector<Vector3f>& pos,
+                                     const std::vector<Vector3f>& normal,
+                                     const std::vector<Vector2f>& tex,
+                                     const std::vector<size_t>& idx);
+constexpr VertexBufferLayout GetVertexPosPNT() {
+  return VertexBufferLayout({SemanticType::Vertex, 0}, SizePNT(), offsetof(VertexPNT, Position));
 }
-constexpr VertexBufferLayout GetVertexLayoutNormalPNT() {
-  return VertexBufferLayout({SemanticType::Normal, 0}, SizePNT(), offsetof(VertexPositionNormalTexCoord, Normal));
+constexpr VertexBufferLayout GetVertexNormalPNT() {
+  return VertexBufferLayout({SemanticType::Normal, 0}, SizePNT(), offsetof(VertexPNT, Normal));
 }
-constexpr VertexBufferLayout GetVertexLayoutTexCoordPNT(int index) {
-  return VertexBufferLayout({SemanticType::TexCoord, index}, SizePNT(), offsetof(VertexPositionNormalTexCoord, TexCoord));
+constexpr VertexBufferLayout GetVertexTexPNT(int index) {
+  return VertexBufferLayout({SemanticType::TexCoord, index}, SizePNT(), offsetof(VertexPNT, TexCoord));
 }
-ShaderAttributeLayout POSITION0();
-ShaderAttributeLayout NORMAL0();
+//在buffer中排列：PTNT PTNT PTNT
+struct VertexPTNT {
+  Vector3f Position;
+  Vector4f Tangent;
+  Vector3f Normal;
+  Vector2f TexCoord;
+};
+constexpr int SizePTNT() { return static_cast<int>(sizeof(VertexPTNT)); }
+std::vector<VertexPTNT> GenVboDataPTNT(const std::vector<Vector3f>& pos,
+                                       const std::vector<Vector4f>& tan,
+                                       const std::vector<Vector3f>& normal,
+                                       const std::vector<Vector2f>& tex);
+std::vector<VertexPTNT> GenVboDataPTNT(const std::vector<Vector3f>& pos,
+                                       const std::vector<Vector4f>& tan,
+                                       const std::vector<Vector3f>& normal,
+                                       const std::vector<Vector2f>& tex,
+                                       const std::vector<size_t>& idx);
+constexpr VertexBufferLayout GetVertexPosPTNT() {
+  return VertexBufferLayout({SemanticType::Vertex, 0}, SizePTNT(), offsetof(VertexPTNT, Position));
+}
+constexpr VertexBufferLayout GetVertexTanPTNT() {
+  return VertexBufferLayout({SemanticType::Tangent, 0}, SizePTNT(), offsetof(VertexPTNT, Tangent));
+}
+constexpr VertexBufferLayout GetVertexNormalPTNT() {
+  return VertexBufferLayout({SemanticType::Normal, 0}, SizePTNT(), offsetof(VertexPTNT, Normal));
+}
+constexpr VertexBufferLayout GetVertexTexPTNT(int index) {
+  return VertexBufferLayout({SemanticType::TexCoord, index}, SizePTNT(), offsetof(VertexPTNT, TexCoord));
+}
+
+ShaderAttributeLayout POSITION();
+ShaderAttributeLayout TANGENT();
+ShaderAttributeLayout NORMAL();
 ShaderAttributeLayout TEXCOORD0();
 
 }  // namespace Hikari

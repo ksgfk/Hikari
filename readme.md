@@ -45,6 +45,12 @@ Linux Ubuntu下，Clang10编译运行通过，GCC没试（懒
 `src/application.cpp`文件里，`ParseArgs`函数里列出了所有支持的命令行参数
 
 ## Show 结果展示
+### 13.Normal Map
+
+<img src="show/13-normal_map.png" alt="13-normal_map.png" width="50%">
+
+PBR加持的法线纹理。实现的时候是用TBN矩阵把法线从切线空间转换到世界空间计算的。转换到切线空间感觉...挺麻烦...
+
 ### 11.PBR Environment
 
 <img src="show/11-pbr_env.png" alt="11-pbr_env.png" width="50%">

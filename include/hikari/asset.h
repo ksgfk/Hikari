@@ -121,6 +121,12 @@ class ImmutableModel : public Asset {
                  std::vector<Vector3f>&& nor,
                  std::vector<Vector2f>&& tex,
                  std::vector<size_t>&& ind) noexcept;
+  ImmutableModel(const std::string& name,
+                 std::vector<Vector3f>&& pos,
+                 std::vector<Vector3f>&& nor,
+                 std::vector<Vector2f>&& tex,
+                 std::vector<Vector4f>&& tan,
+                 std::vector<size_t>&& ind) noexcept;
   ImmutableModel(const ImmutableModel&) = delete;
   ImmutableModel(ImmutableModel&&) noexcept;
   ImmutableModel& operator=(ImmutableModel&&) noexcept;
@@ -132,6 +138,7 @@ class ImmutableModel : public Asset {
   const std::vector<Vector3f>& GetPosition() const;
   const std::vector<Vector3f>& GetNormals() const;
   const std::vector<Vector2f>& GetTexCoords() const;
+  const std::vector<Vector4f>& GetTangents() const;
   const std::vector<size_t>& GetIndices() const;
   /**
     * @brief 是否存在法线
@@ -141,8 +148,13 @@ class ImmutableModel : public Asset {
     * @brief 是否存在纹理坐标
     */
   bool HasTexCoord() const;
+  /**
+   * @brief 是否存在切线
+  */
+  bool HasTangent() const;
   size_t GetVertexCount() const;
   size_t GetIndexCount() const;
+  size_t GetTriangleCount() const;
 
   static bool LoadFromFile(const std::string&, const std::filesystem::path&, ImmutableModel&);
   static ImmutableModel CreateSphere(const std::string& name, float radius, int numberSlices);
@@ -153,6 +165,7 @@ class ImmutableModel : public Asset {
   std::vector<Vector3f> _positions;
   std::vector<Vector3f> _normals;
   std::vector<Vector2f> _texcoords;
+  std::vector<Vector4f> _tangent;
   std::vector<size_t> _indices;
   std::string _name;
 };

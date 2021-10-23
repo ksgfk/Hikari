@@ -42,7 +42,7 @@ class BlinnPass : public RenderPass {
   BlinnPass() : RenderPass("blinn pass", 1) {}
 
   void OnStart() override {
-    LoadProgram("blinn.vert", "blinn.frag", {POSITION0(), NORMAL0()});
+    LoadProgram("blinn.vert", "blinn.frag", {POSITION(), NORMAL()});
 
     _sphere = GetApp().GetGameObject<Sphere>("sphere0");
 
@@ -59,8 +59,8 @@ class BlinnPass : public RenderPass {
     GetProgram()->UniformVec3("u_blinn.ks", _ks.GetAddress());
     GetProgram()->UniformFloat("u_blinn.shiness", _shiness);
     SetModelMatrix(*_sphere);
-    SetVertexBuffer(_sphere->Vbo, GetVertexLayoutPositionPNT());
-    SetVertexBuffer(_sphere->Vbo, GetVertexLayoutNormalPNT());
+    SetVertexBuffer(_sphere->Vbo, GetVertexPosPNT());
+    SetVertexBuffer(_sphere->Vbo, GetVertexNormalPNT());
     SetIndexBuffer(_sphere->Ibo);
     DrawIndexed(_sphere->VertexCount, 0);
   }
@@ -82,7 +82,7 @@ class MicrofacetCookTorrance : public RenderPass {
   MicrofacetCookTorrance(Vector3f albedo) : _albedo(albedo) {}
 
   void OnStart() override {
-    LoadProgram("cook_torrance.vert", "cook_torrance.frag", {POSITION0(), NORMAL0()});
+    LoadProgram("cook_torrance.vert", "cook_torrance.frag", {POSITION(), NORMAL()});
 
     for (int i = 0; i < Count; i++) {
       _spheres[i] = GetApp().GetGameObject<Sphere>(std::string("sphere") + std::to_string(i + 1));
@@ -107,8 +107,8 @@ class MicrofacetCookTorrance : public RenderPass {
         auto& sphere = _spheres[i * 5 + j];
         GetProgram()->UniformFloat("u_metal.Metallic", _metallic[j]);
         SetModelMatrix(*sphere);
-        SetVertexBuffer(sphere->Vbo, GetVertexLayoutPositionPNT());
-        SetVertexBuffer(sphere->Vbo, GetVertexLayoutNormalPNT());
+        SetVertexBuffer(sphere->Vbo, GetVertexPosPNT());
+        SetVertexBuffer(sphere->Vbo, GetVertexNormalPNT());
         SetIndexBuffer(sphere->Ibo);
         DrawIndexed(sphere->VertexCount, 0);
       }

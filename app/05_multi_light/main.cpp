@@ -21,7 +21,7 @@ class BlinnPass : public RenderPass {
   BlinnPass() : RenderPass("blinn pass", 0) {}
 
   void OnStart() override {
-    LoadProgram("blinn.vert", "blinn.frag", {POSITION0(), NORMAL0()});
+    LoadProgram("blinn.vert", "blinn.frag", {POSITION(), NORMAL()});
     _cube = GetApp().GetGameObject<Cube>("cube");
 
     _kd = Vector3f(0.2f, 0.2f, 0.2f);
@@ -38,8 +38,8 @@ class BlinnPass : public RenderPass {
     GetProgram()->UniformVec3("u_blinn.ks", _ks.GetAddress());
     GetProgram()->UniformFloat("u_blinn.shiness", _shiness);
     SetModelMatrix(*_cube);
-    SetVertexBuffer(_cube->Vbo, GetVertexLayoutPositionPNT());
-    SetVertexBuffer(_cube->Vbo, GetVertexLayoutNormalPNT());
+    SetVertexBuffer(_cube->Vbo, GetVertexPosPNT());
+    SetVertexBuffer(_cube->Vbo, GetVertexNormalPNT());
     Draw(_cube->VertexCount, 0);
   }
 

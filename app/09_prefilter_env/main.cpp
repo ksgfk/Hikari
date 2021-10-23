@@ -51,7 +51,7 @@ class ColorPass : public RenderPass {
   ColorPass() : RenderPass("Color Pass", 1) {}
 
   void OnStart() override {
-    LoadProgram("texture.vert", "texture.frag", {POSITION0(), NORMAL0()});
+    LoadProgram("texture.vert", "texture.frag", {POSITION(), NORMAL()});
   }
 
   void OnPostStart() override {
@@ -69,8 +69,8 @@ class ColorPass : public RenderPass {
       SetModelMatrix(*sphere[i]);
       GetProgram()->UniformCubeMap("u_cube", BindTexture(*convSky));
       GetProgram()->UniformInt("u_roughness", i);
-      SetVertexBuffer(sphere[i]->Vbo, GetVertexLayoutPositionPNT());
-      SetVertexBuffer(sphere[i]->Vbo, GetVertexLayoutNormalPNT());
+      SetVertexBuffer(sphere[i]->Vbo, GetVertexPosPNT());
+      SetVertexBuffer(sphere[i]->Vbo, GetVertexNormalPNT());
       SetIndexBuffer(sphere[i]->Ibo);
       DrawIndexed(sphere[i]->IndexCount, 0);
     }
@@ -130,7 +130,7 @@ class SkyboxPass : public RenderPass {
     _conv = GetContext().PrefilterEnvMap(_skybox, convDesc, GetApp().GetShaderLibPath());
     std::cout << "Done." << std::endl;
 
-    LoadProgram("skybox.vert", "skybox.frag", {POSITION0()});
+    LoadProgram("skybox.vert", "skybox.frag", {POSITION()});
     PipelineState state{};
     state.Depth.Comparison = DepthComparison::LessEqual;
     SetPipelineState(state);
@@ -147,7 +147,7 @@ class SkyboxPass : public RenderPass {
     prog->UniformMat4("view", GetCamera()->GetSkyboxViewMatrix().GetAddress());
     prog->UniformMat4("projection", GetCamera()->GetProjectionMatrix().GetAddress());
     prog->UniformCubeMap("u_skybox", BindTexture(*_skybox));
-    SetVertexBuffer(*(_cube->Vbo), GetVertexLayoutPositionPNT());
+    SetVertexBuffer(*(_cube->Vbo), GetVertexPosPNT());
     Draw(_cube->VertexCount, 0);
   }
 

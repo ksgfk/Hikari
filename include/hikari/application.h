@@ -135,6 +135,8 @@ class Renderable {
  protected:
   void CreateVbo(const ImmutableModel& model);
   void CreateVboIbo(const ImmutableModel& model);
+  void CreateVboWithTangent(const ImmutableModel& model);
+  void CreateVboIboWithTangent(const ImmutableModel& model);
 
  private:
   std::shared_ptr<BufferOpenGL> _vbo;
@@ -142,9 +144,21 @@ class Renderable {
   int _drawCount{};
 };
 
-class RenderableCube : public Renderable {
+class RenderableWithTangent : public Renderable {
  public:
-  RenderableCube(float halfExtend) noexcept;
+  RenderableWithTangent(float hasTan) noexcept;
+  ~RenderableWithTangent() override = default;
+
+ protected:
+  bool HasTangent() const { return _hasTangent; }
+
+ private:
+  bool _hasTangent;
+};
+
+class RenderableCube : public RenderableWithTangent {
+ public:
+  RenderableCube(float halfExtend, bool getTan = false) noexcept;
   ~RenderableCube() override = default;
 
   void OnCreate() override;
@@ -153,9 +167,9 @@ class RenderableCube : public Renderable {
   float _halfExtend;
 };
 
-class RenderableSphere : public Renderable {
+class RenderableSphere : public RenderableWithTangent {
  public:
-  RenderableSphere(float radius, int numberSlices) noexcept;
+  RenderableSphere(float radius, int numberSlices, bool getTan = false) noexcept;
   ~RenderableSphere() override = default;
 
   void OnCreate() override;
@@ -165,9 +179,9 @@ class RenderableSphere : public Renderable {
   int _slice;
 };
 
-class RenderableQuad : public Renderable {
+class RenderableQuad : public RenderableWithTangent {
  public:
-  RenderableQuad(float halfExtend) noexcept;
+  RenderableQuad(float halfExtend, bool getTan = false) noexcept;
   ~RenderableQuad() override = default;
 
   void OnCreate() override;
@@ -176,9 +190,9 @@ class RenderableQuad : public Renderable {
   float _halfExtend;
 };
 
-class RenderableSimple : public Renderable {
+class RenderableSimple : public RenderableWithTangent {
  public:
-  RenderableSimple(std::function<ImmutableModel(Renderable&)> onCreate);
+  RenderableSimple(std::function<ImmutableModel(Renderable&)> onCreate, bool getTan = false);
   ~RenderableSimple() override = default;
 
   void OnCreate() final;

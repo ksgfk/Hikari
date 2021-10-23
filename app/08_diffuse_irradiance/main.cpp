@@ -54,7 +54,7 @@ class MicrofacetPass : public RenderPass {
   MicrofacetPass() : RenderPass("Cook Torrance Pass", 1) {}
 
   void OnStart() override {
-    LoadProgram("cook_torrance.vert", "cook_torrance.frag", {POSITION0(), NORMAL0()});
+    LoadProgram("cook_torrance.vert", "cook_torrance.frag", {POSITION(), NORMAL()});
 
     albedo = Vector3f(1.0f, 1.0f, 1.0f);
     for (size_t i = 1; i < Cnt; i++) {
@@ -85,8 +85,8 @@ class MicrofacetPass : public RenderPass {
         auto& sphere = _spheres[i * 5 + j];
         GetProgram()->UniformFloat("u_metal.Metallic", metallic[j]);
         SetModelMatrix(*sphere);
-        SetVertexBuffer(sphere->Vbo, GetVertexLayoutPositionPNT());
-        SetVertexBuffer(sphere->Vbo, GetVertexLayoutNormalPNT());
+        SetVertexBuffer(sphere->Vbo, GetVertexPosPNT());
+        SetVertexBuffer(sphere->Vbo, GetVertexNormalPNT());
         SetIndexBuffer(sphere->Ibo);
         DrawIndexed(sphere->IndexCount, 0);
       }
@@ -153,7 +153,7 @@ class SkyboxPass : public RenderPass {
     _conv = GetContext().GenIrradianceConvolutionCubemap(_skybox, convDesc, GetApp().GetShaderLibPath());
     std::cout << "Done." << std::endl;
 
-    LoadProgram("skybox.vert", "skybox.frag", {POSITION0()});
+    LoadProgram("skybox.vert", "skybox.frag", {POSITION()});
     PipelineState state{};
     state.Depth.Comparison = DepthComparison::LessEqual;
     SetPipelineState(state);
@@ -170,7 +170,7 @@ class SkyboxPass : public RenderPass {
     prog->UniformMat4("view", GetCamera()->GetSkyboxViewMatrix().GetAddress());
     prog->UniformMat4("projection", GetCamera()->GetProjectionMatrix().GetAddress());
     prog->UniformCubeMap("u_skybox", BindTexture(*_skybox));
-    SetVertexBuffer(*(_cube->Vbo), GetVertexLayoutPositionPNT());
+    SetVertexBuffer(*(_cube->Vbo), GetVertexPosPNT());
     Draw(_cube->VertexCount, 0);
   }
 

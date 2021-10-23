@@ -1412,7 +1412,9 @@ void TextureOpenGL::CreateTexture2d(const Texture2dDescriptorOpenGL& desc, Textu
     HIKARI_CHECK_GL(glTextureParameteri(name, GL_TEXTURE_WRAP_S, wrap));
     HIKARI_CHECK_GL(glTextureParameteri(name, GL_TEXTURE_WRAP_T, wrap));
     HIKARI_CHECK_GL(glTextureStorage2D(name, levels, texFormat, width, height));
-    HIKARI_CHECK_GL(glTextureSubImage2D(name, 0, 0, 0, width, height, dataFormat, dataType, desc.DataPtr));
+    if (desc.DataPtr != nullptr) {
+      HIKARI_CHECK_GL(glTextureSubImage2D(name, 0, 0, 0, width, height, dataFormat, dataType, desc.DataPtr));
+    }
     HIKARI_CHECK_GL(glGenerateTextureMipmap(name));
     texture._handle = name;
   } else {
@@ -1424,7 +1426,9 @@ void TextureOpenGL::CreateTexture2d(const Texture2dDescriptorOpenGL& desc, Textu
     HIKARI_CHECK_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap));
     if (feature.CanUseTextureStorage()) {
       HIKARI_CHECK_GL(glTexStorage2D(GL_TEXTURE_2D, levels, texFormat, width, height));
-      HIKARI_CHECK_GL(glTextureSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, dataFormat, dataType, desc.DataPtr));
+      if (desc.DataPtr != nullptr) {
+        HIKARI_CHECK_GL(glTextureSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, dataFormat, dataType, desc.DataPtr));
+      }
     } else {
       HIKARI_CHECK_GL(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, levels - 1));
       HIKARI_CHECK_GL(glTexImage2D(GL_TEXTURE_2D,

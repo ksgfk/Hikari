@@ -31,7 +31,7 @@ class PbrPass : public RenderPass {
   }
 
   void OnStart() override {
-    LoadProgram("cook_torrance.vert", "cook_torrance.frag", {POSITION0(), NORMAL0()});
+    LoadProgram("cook_torrance.vert", "cook_torrance.frag", {POSITION(), NORMAL()});
 
     ImmutableHdrTexture env("hdr", GetApp().GetAssetPath() / "skybox_pillars_4k" / "pillars_4k.hdr", true);
     Texture2dDescriptorOpenGL hdrDesc;
@@ -132,8 +132,8 @@ class PbrPass : public RenderPass {
         auto& sphere = spheres[i * 5 + j];
         GetProgram()->UniformFloat("u_metal.Metallic", j == 0 ? 0.05f : 0.25f * j);
         SetModelMatrix(*sphere);
-        SetVertexBuffer(sphere->sphere->GetVbo(), GetVertexLayoutPositionPNT());
-        SetVertexBuffer(sphere->sphere->GetVbo(), GetVertexLayoutNormalPNT());
+        SetVertexBuffer(sphere->sphere->GetVbo(), GetVertexPosPNT());
+        SetVertexBuffer(sphere->sphere->GetVbo(), GetVertexNormalPNT());
         SetIndexBuffer(sphere->sphere->GetIbo());
         sphere->sphere->Draw(*this);
       }
@@ -154,7 +154,7 @@ class SkyboxPass : public RenderPass {
   SkyboxPass() : RenderPass("Skybox Pass", 2) {}
 
   void OnStart() override {
-    LoadProgram("skybox.vert", "skybox.frag", {POSITION0()});
+    LoadProgram("skybox.vert", "skybox.frag", {POSITION()});
 
     PipelineState state{};
     state.Depth.Comparison = DepthComparison::LessEqual;
@@ -171,7 +171,7 @@ class SkyboxPass : public RenderPass {
     ActivePipelineConfig();
     ActiveProgram();
     GetProgram()->UniformCubeMap("u_skybox", BindTexture(*skybox));
-    SetVertexBuffer(cube->GetVbo(), GetVertexLayoutPositionPNT());
+    SetVertexBuffer(cube->GetVbo(), GetVertexPosPNT());
     cube->Draw(*this);
   }
 

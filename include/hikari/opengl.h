@@ -220,7 +220,8 @@ enum class SemanticType {
   Vertex,
   Normal,
   TexCoord,
-  Color
+  Color,
+  Tangent
 };
 
 struct AttributeSemantic {

@@ -223,6 +223,9 @@ constexpr Vector<Value, 3> Cross(const Vector<Value, 3>& a, const Vector<Value, 
       a.X() * b.Y() - a.Y() * b.X());
 }
 
+/**
+ * @brief 对所有元素求sin
+*/
 template <typename Type, size_t Size>
 Vector<Type, Size> Sin(const Vector<Type, Size>& vec) {
   Vector<Type, Size> result;
@@ -232,6 +235,9 @@ Vector<Type, Size> Sin(const Vector<Type, Size>& vec) {
   return result;
 }
 
+/**
+ * @brief 对所有元素求cos
+*/
 template <typename Type, size_t Size>
 Vector<Type, Size> Cos(const Vector<Type, Size>& vec) {
   Vector<Type, Size> result;
@@ -241,6 +247,9 @@ Vector<Type, Size> Cos(const Vector<Type, Size>& vec) {
   return result;
 }
 
+/**
+ * @brief 对所有元素求tan
+*/
 template <typename Type, size_t Size>
 Vector<Type, Size> Tan(const Vector<Type, Size>& vec) {
   Vector<Type, Size> result;
@@ -250,6 +259,9 @@ Vector<Type, Size> Tan(const Vector<Type, Size>& vec) {
   return result;
 }
 
+/**
+ * @brief 对所有元素求弧度
+*/
 template <typename Type, size_t Size>
 constexpr Vector<Type, Size> Radian(const Vector<Type, Size>& vec) {
   Vector<Type, Size> result;
@@ -259,6 +271,9 @@ constexpr Vector<Type, Size> Radian(const Vector<Type, Size>& vec) {
   return result;
 }
 
+/**
+ * @brief 对所有元素求角度
+*/
 template <typename Type, size_t Size>
 constexpr Vector<Type, Size> Angle(const Vector<Type, Size>& vec) {
   Vector<Type, Size> result;
@@ -266,6 +281,24 @@ constexpr Vector<Type, Size> Angle(const Vector<Type, Size>& vec) {
     result[i] = Type(180) / Type(PI_VALUE) * vec[i];
   }
   return result;
+}
+
+//https://en.wikipedia.org/wiki/Vector_projection
+/**
+ * @brief 向量a在b上的投影
+*/
+template <typename Type, size_t Size>
+constexpr Vector<Type, Size> Project(const Vector<Type, Size>& a, const Vector<Type, Size>& b) {
+  return (b * (Dot(a, b) / Dot(b, b)));
+}
+
+//没见过这个运算...
+/**
+ * @brief 向量a在b上的投影
+*/
+template <typename Type, size_t Size>
+constexpr Vector<Type, Size> Reject(const Vector<Type, Size>& a, const Vector<Type, Size>& b) {
+  return (a - b * Vector<Type, Size>(Dot(a, b) / Dot(b, b)));
 }
 
 /**

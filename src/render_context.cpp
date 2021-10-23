@@ -338,6 +338,26 @@ std::shared_ptr<TextureOpenGL> RenderContextOpenGL::CreateTexture2D(const Textur
   return texture;
 }
 
+std::shared_ptr<TextureOpenGL> RenderContextOpenGL::LoadBitmap2D(
+    std::filesystem::path p,
+    WrapMode wrap,
+    FilterMode filter,
+    PixelFormat format) {
+  ImmutableBitmap env("hdr", p, true);
+  Texture2dDescriptorOpenGL desc;
+  desc.Wrap = wrap;
+  desc.MinFilter = filter;
+  desc.MagFilter = filter;
+  desc.MipMapLevel = 0;
+  desc.TextureFormat = format;
+  desc.Width = env.GetWidth();
+  desc.Height = env.GetHeight();
+  desc.DataFormat = env.GetChannel() == 3 ? ImageDataFormat::RGB : ImageDataFormat::RGBA;
+  desc.DataType = ImageDataType::Byte;
+  desc.DataPtr = env.GetData();
+  return CreateTexture2D(desc);
+}
+
 std::shared_ptr<TextureOpenGL> RenderContextOpenGL::CreateCubeMap(const TextureCubeMapDescriptorOpenGL& desc) {
   CheckInit();
   auto texture = std::make_shared<TextureOpenGL>(desc);
@@ -393,6 +413,18 @@ std::shared_ptr<BufferOpenGL> RenderContextOpenGL::CreateQuadVbo(float halfExten
   return vbo;
 }
 
+std::shared_ptr<BufferOpenGL> RenderContextOpenGL::CreateVbo(const std::vector<VertexPNT>& pnt) {
+  auto data = pnt.data();
+  auto size = pnt.size() * SizePNT();
+  return CreateVertexBuffer(data, size);
+}
+
+std::shared_ptr<BufferOpenGL> RenderContextOpenGL::CreateVbo(const std::vector<VertexPTNT>& ptnt) {
+  auto data = ptnt.data();
+  auto size = ptnt.size() * SizePTNT();
+  return CreateVertexBuffer(data, size);
+}
+
 std::shared_ptr<TextureOpenGL> RenderContextOpenGL::ConvertSphericalToCubemap(
     const Texture2dDescriptorOpenGL& tex2d,
     const TextureCubeMapDescriptorOpenGL& _cubeConfig,
@@ -406,7 +438,7 @@ std::shared_ptr<TextureOpenGL> RenderContextOpenGL::ConvertSphericalToCubemap(
   int verCnt{};
   std::shared_ptr<BufferOpenGL> vbo = CreateCubeVbo(1, verCnt);
   auto prog = LoadShaderProgram(shaderLib / "SphericalToCubeMap.vert", shaderLib / "SphericalToCubeMap.frag",
-                                shaderLib, {POSITION0()});  //转换shader
+                                shaderLib, {POSITION()});  //转换shader
   GLuint captureFBO, captureRBO;
   HIKARI_CHECK_GL(glGenFramebuffers(1, &captureFBO));
   HIKARI_CHECK_GL(glGenRenderbuffers(1, &captureRBO));
@@ -434,7 +466,7 @@ std::shared_ptr<TextureOpenGL> RenderContextOpenGL::ConvertSphericalToCubemap(
                                            cubemap->GetHandle(),
                                            0));
     HIKARI_CHECK_GL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
-    auto layout = GetVertexLayoutPositionPNT();
+    auto layout = GetVertexPosPNT();
     auto bp = prog->GetBindingPoint(layout.Semantic);
     vao.SetVertexBuffer({(GLuint)bp, vbo->GetHandle(), layout.Offset, layout.Stride});
     DrawArrays(PrimitiveMode::Triangles, 0, verCnt);
@@ -459,7 +491,7 @@ std::shared_ptr<TextureOpenGL> RenderContextOpenGL::GenIrradianceConvolutionCube
   int verCnt{};
   std::shared_ptr<BufferOpenGL> vbo = CreateCubeVbo(1, verCnt);
   auto prog = LoadShaderProgram(shaderLib / "IrradianceConvolution.vert", shaderLib / "IrradianceConvolution.frag",
-                                shaderLib, {POSITION0()});
+                                shaderLib, {POSITION()});
   GLuint captureFBO, captureRBO;
   HIKARI_CHECK_GL(glGenFramebuffers(1, &captureFBO));
   HIKARI_CHECK_GL(glGenRenderbuffers(1, &captureRBO));
@@ -486,7 +518,7 @@ std::shared_ptr<TextureOpenGL> RenderContextOpenGL::GenIrradianceConvolutionCube
                                            cubemap->GetHandle(),
                                            0));
     HIKARI_CHECK_GL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
-    auto layout = GetVertexLayoutPositionPNT();
+    auto layout = GetVertexPosPNT();
     auto bp = prog->GetBindingPoint(layout.Semantic);
     vao.SetVertexBuffer({(GLuint)bp, vbo->GetHandle(), layout.Offset, layout.Stride});
     DrawArrays(PrimitiveMode::Triangles, 0, verCnt);
@@ -515,7 +547,7 @@ std::shared_ptr<TextureOpenGL> RenderContextOpenGL::PrefilterEnvMap(
   }
   auto cube = CreateCubeMap(cfg);
   auto prog = LoadShaderProgram(shaderLib / "PreFilterEnv.vert", shaderLib / "PreFilterEnv.frag",
-                                shaderLib, {POSITION0()});
+                                shaderLib, {POSITION()});
   int verCnt{};
   std::shared_ptr<BufferOpenGL> vbo = CreateCubeVbo(1, verCnt);
   GLuint captureFBO, captureRBO;
@@ -549,7 +581,7 @@ std::shared_ptr<TextureOpenGL> RenderContextOpenGL::PrefilterEnvMap(
                                              cube->GetHandle(),
                                              mip));
       HIKARI_CHECK_GL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
-      auto layout = GetVertexLayoutPositionPNT();
+      auto layout = GetVertexPosPNT();
       auto bp = prog->GetBindingPoint(layout.Semantic);
       vao.SetVertexBuffer({(GLuint)bp, vbo->GetHandle(), layout.Offset, layout.Stride});
       DrawArrays(PrimitiveMode::Triangles, 0, verCnt);
@@ -574,7 +606,7 @@ std::shared_ptr<TextureOpenGL> RenderContextOpenGL::PrecomputeBrdfLut(
   int verCnt{};
   auto vbo = CreateQuadVbo(1, verCnt);
   auto prog = LoadShaderProgram(shaderLib / "BrdfLut.vert", shaderLib / "BrdfLut.frag",
-                                shaderLib, {POSITION0(), TEXCOORD0()});
+                                shaderLib, {POSITION(), TEXCOORD0()});
   GLuint captureFBO, captureRBO;
   HIKARI_CHECK_GL(glGenFramebuffers(1, &captureFBO));
   HIKARI_CHECK_GL(glGenRenderbuffers(1, &captureRBO));
@@ -588,8 +620,48 @@ std::shared_ptr<TextureOpenGL> RenderContextOpenGL::PrecomputeBrdfLut(
   prog->Bind();
   auto& vao = GetVertexArray(prog);
   vao.Bind();
-  auto pos = GetVertexLayoutPositionPNT();
-  auto tex = GetVertexLayoutTexCoordPNT(0);
+  auto pos = GetVertexPosPNT();
+  auto tex = GetVertexTexPNT(0);
+  auto pbp = prog->GetBindingPoint(pos.Semantic);
+  auto tbp = prog->GetBindingPoint(tex.Semantic);
+  vao.SetVertexBuffer({(GLuint)pbp, vbo->GetHandle(), pos.Offset, pos.Stride});
+  vao.SetVertexBuffer({(GLuint)tbp, vbo->GetHandle(), tex.Offset, tex.Stride});
+  DrawArrays(PrimitiveMode::Triangles, 0, verCnt);
+  HIKARI_CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
+
+  DestroyObject(vbo);
+  DestroyObject(prog);
+  HIKARI_CHECK_GL(glDeleteFramebuffers(1, &captureFBO));
+  HIKARI_CHECK_GL(glDeleteRenderbuffers(1, &captureRBO));
+
+  return lut;
+}
+
+std::shared_ptr<TextureOpenGL> RenderContextOpenGL::PrecomputerBrdfMultiScatteringLut(
+    const Texture2dDescriptorOpenGL& desc,
+    const std::filesystem::path& shaderLib) {
+  auto cfg = desc;
+  cfg.DataPtr = nullptr;
+  auto lut = CreateTexture2D(cfg);
+  int verCnt{};
+  auto vbo = CreateQuadVbo(1, verCnt);
+  auto prog = LoadShaderProgram(shaderLib / "BrdfLut.vert", shaderLib / "BrdfLutMultiScattering.frag",
+                                shaderLib, {POSITION(), TEXCOORD0()});
+  GLuint captureFBO, captureRBO;
+  HIKARI_CHECK_GL(glGenFramebuffers(1, &captureFBO));
+  HIKARI_CHECK_GL(glGenRenderbuffers(1, &captureRBO));
+  HIKARI_CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, captureFBO));
+  HIKARI_CHECK_GL(glBindRenderbuffer(GL_RENDERBUFFER, captureRBO));
+  HIKARI_CHECK_GL(glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, cfg.Width, cfg.Height));
+  HIKARI_CHECK_GL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, lut->GetHandle(), 0));
+  HIKARI_CHECK_GL(glViewport(0, 0, cfg.Width, cfg.Height));
+  HIKARI_CHECK_GL(glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT));
+  HIKARI_CHECK_GL(glEnable(GL_DEPTH_TEST));
+  prog->Bind();
+  auto& vao = GetVertexArray(prog);
+  vao.Bind();
+  auto pos = GetVertexPosPNT();
+  auto tex = GetVertexTexPNT(0);
   auto pbp = prog->GetBindingPoint(pos.Semantic);
   auto tbp = prog->GetBindingPoint(tex.Semantic);
   vao.SetVertexBuffer({(GLuint)pbp, vbo->GetHandle(), pos.Offset, pos.Stride});
@@ -933,10 +1005,10 @@ void RenderContextOpenGL::AddObjectToSet(const std::shared_ptr<ObjectOpenGL>& ob
   }
 }
 
-std::vector<VertexPositionNormalTexCoord> GenVboDataPNT(const std::vector<Vector3f>& pos,
-                                                        const std::vector<Vector3f>& normal,
-                                                        const std::vector<Vector2f>& tex) {
-  std::vector<VertexPositionNormalTexCoord> pnt(pos.size(), VertexPositionNormalTexCoord{});
+std::vector<VertexPNT> GenVboDataPNT(const std::vector<Vector3f>& pos,
+                                     const std::vector<Vector3f>& normal,
+                                     const std::vector<Vector2f>& tex) {
+  std::vector<VertexPNT> pnt(pos.size(), VertexPNT{});
   for (size_t i = 0; i < pos.size(); i++) {
     auto p = pos[i];
     auto n = normal.size() > 0 ? normal[i] : Vector3f(0.0f);
@@ -946,11 +1018,11 @@ std::vector<VertexPositionNormalTexCoord> GenVboDataPNT(const std::vector<Vector
   return pnt;
 }
 
-std::vector<VertexPositionNormalTexCoord> GenVboDataPNT(const std::vector<Vector3f>& pos,
-                                                        const std::vector<Vector3f>& normal,
-                                                        const std::vector<Vector2f>& tex,
-                                                        const std::vector<size_t>& idx) {
-  std::vector<VertexPositionNormalTexCoord> pnt(idx.size(), VertexPositionNormalTexCoord{});
+std::vector<VertexPNT> GenVboDataPNT(const std::vector<Vector3f>& pos,
+                                     const std::vector<Vector3f>& normal,
+                                     const std::vector<Vector2f>& tex,
+                                     const std::vector<size_t>& idx) {
+  std::vector<VertexPNT> pnt(idx.size(), VertexPNT{});
   for (size_t i = 0; i < idx.size(); i++) {
     auto p = pos[idx[i]];
     auto n = normal.size() > 0 ? normal[idx[i]] : Vector3f(0.0f);
@@ -960,11 +1032,46 @@ std::vector<VertexPositionNormalTexCoord> GenVboDataPNT(const std::vector<Vector
   return pnt;
 }
 
-ShaderAttributeLayout POSITION0() {
+std::vector<VertexPTNT> GenVboDataPTNT(const std::vector<Vector3f>& pos,
+                                       const std::vector<Vector4f>& tan,
+                                       const std::vector<Vector3f>& normal,
+                                       const std::vector<Vector2f>& tex) {
+  std::vector<VertexPTNT> pnt(pos.size(), VertexPTNT{});
+  for (size_t i = 0; i < pos.size(); i++) {
+    auto p = pos[i];
+    auto _tan = tan.size() > 0 ? tan[i] : Vector4f(0.0f);
+    auto n = normal.size() > 0 ? normal[i] : Vector3f(0.0f);
+    auto _tex = tex.size() > 0 ? tex[i] : Vector2f(0.0f);
+    pnt[i] = {p, _tan, n, _tex};
+  }
+  return pnt;
+}
+
+std::vector<VertexPTNT> GenVboDataPTNT(const std::vector<Vector3f>& pos,
+                                       const std::vector<Vector4f>& tan,
+                                       const std::vector<Vector3f>& normal,
+                                       const std::vector<Vector2f>& tex,
+                                       const std::vector<size_t>& idx) {
+  std::vector<VertexPTNT> pnt(idx.size(), VertexPTNT{});
+  for (size_t i = 0; i < idx.size(); i++) {
+    auto p = pos[idx[i]];
+    auto _tan = tan.size() > 0 ? tan[idx[i]] : Vector4f(0.0f);
+    auto n = normal.size() > 0 ? normal[idx[i]] : Vector3f(0.0f);
+    auto _tex = tex.size() > 0 ? tex[idx[i]] : Vector2f(0.0f);
+    pnt[i] = {p, _tan, n, _tex};
+  }
+  return pnt;
+}
+
+ShaderAttributeLayout POSITION() {
   return ShaderAttributeLayout{"a_Pos", SemanticType::Vertex, 0};
 }
 
-ShaderAttributeLayout NORMAL0() {
+ShaderAttributeLayout TANGENT() {
+  return ShaderAttributeLayout{"a_Tangent", SemanticType::Tangent, 0};
+}
+
+ShaderAttributeLayout NORMAL() {
   return ShaderAttributeLayout{"a_Normal", SemanticType::Normal, 0};
 }
 

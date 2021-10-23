@@ -94,6 +94,10 @@ float D_GGX(float NoH, float a) {
   return a2 / (PI * f * f);
 }
 
+vec3 F_Schlik(vec3 F0, float F90, float u) {
+  return F0 + (F90 - F0) * pow(1.f - u, 5.0);
+}
+
 vec3 F_Schlick(float u, vec3 f0) {
   return f0 + (vec3(1.0) - f0) * pow(1.0 - u, 5.0);
 }

@@ -114,7 +114,7 @@ class SkyboxPass : public RenderPass {
     prog->UniformMat4("view", GetCamera()->GetSkyboxViewMatrix().GetAddress());
     prog->UniformMat4("projection", GetCamera()->GetProjectionMatrix().GetAddress());
     prog->UniformCubeMap("skybox", BindTexture(*_skybox));
-    SetVertexBuffer(*(_cube->Vbo), GetVertexLayoutPositionPNT());
+    SetVertexBuffer(*(_cube->Vbo), GetVertexPosPNT());
     Draw(_cube->VertexCount, 0);
   }
 
@@ -149,8 +149,8 @@ class NormalPass : public RenderPass {
     prog->UniformMat4("model", _sphere->GetTransform().ObjectToWorldMatrix().GetAddress());
     prog->UniformMat4("view", GetCamera()->GetViewMatrix().GetAddress());
     prog->UniformMat4("projection", GetCamera()->GetProjectionMatrix().GetAddress());
-    SetVertexBuffer(*(_sphere->Vbo), GetVertexLayoutPositionPNT());
-    SetVertexBuffer(*(_sphere->Vbo), GetVertexLayoutNormalPNT());
+    SetVertexBuffer(*(_sphere->Vbo), GetVertexPosPNT());
+    SetVertexBuffer(*(_sphere->Vbo), GetVertexNormalPNT());
     SetIndexBuffer(*(_sphere->Ibo));
     DrawIndexed(_sphere->IndexCount, 0);
   }

@@ -119,17 +119,13 @@ RenderContextOpenGL& GameObject::GetContext() { return GetApp().GetContext(); }
 
 void GameObject::CreateVbo(const ImmutableModel& model, std::shared_ptr<BufferOpenGL>& vbo) {
   auto d = GenVboDataPNT(model.GetPosition(), model.GetNormals(), model.GetTexCoords(), model.GetIndices());
-  auto data = d.data();
-  auto size = d.size() * sizeof(decltype(d)::value_type);
-  vbo = Application::GetInstance().GetContext().CreateVertexBuffer(data, size);
+  vbo = Application::GetInstance().GetContext().CreateVbo(d);
 }
 
 void GameObject::CreateVboIbo(const ImmutableModel& model,
                               std::shared_ptr<BufferOpenGL>& vbo, std::shared_ptr<BufferOpenGL>& ibo) {
   auto vertex = GenVboDataPNT(model.GetPosition(), model.GetNormals(), model.GetTexCoords());
-  auto vertexData = vertex.data();
-  auto vertexSize = vertex.size() * sizeof(decltype(vertex)::value_type);
-  vbo = Application::GetInstance().GetContext().CreateVertexBuffer(vertexData, vertexSize);
+  vbo = Application::GetInstance().GetContext().CreateVbo(vertex);
   std::vector<uint32_t> indices(model.GetIndexCount());
   for (size_t i = 0; i < model.GetIndexCount(); i++) {
     if (model.GetIndices()[i] >= std::numeric_limits<uint32_t>::max()) {
@@ -286,30 +282,91 @@ void Renderable::CreateVboIbo(const ImmutableModel& model) {
   GameObject::CreateVboIbo(model, _vbo, _ibo);
 }
 
-RenderableCube::RenderableCube(float halfExtend) noexcept : Renderable(), _halfExtend(halfExtend) {}
-
-void RenderableCube::OnCreate() { CreateVbo(ImmutableModel::CreateCube("cube", _halfExtend)); }
-
-RenderableSphere::RenderableSphere(float radius, int numberSlices) noexcept
-    : Renderable(), _radius(radius), _slice(numberSlices) {}
-
-void RenderableSphere::OnCreate() { CreateVboIbo(ImmutableModel::CreateSphere("sphere", _radius, _slice)); }
-
-RenderableQuad::RenderableQuad(float halfExtend) noexcept : Renderable(), _halfExtend(halfExtend) {}
-
-void RenderableQuad::OnCreate() { CreateVbo(ImmutableModel::CreateQuad("quad", _halfExtend)); }
-
-RenderableSimple::RenderableSimple(std::function<ImmutableModel(Renderable&)> onCreate) : Renderable() {
-  _onCreate = std::move(onCreate);
+void Renderable::CreateVboWithTangent(const ImmutableModel& model) {
+  auto ptnt = GenVboDataPTNT(model.GetPosition(),
+                             model.GetTangents(),
+                             model.GetNormals(),
+                             model.GetTexCoords(),
+                             model.GetIndices());
+  _drawCount = int(model.GetIndexCount());
+  _vbo = Application::GetInstance().GetContext().CreateVbo(ptnt);
 }
+
+void Renderable::CreateVboIboWithTangent(const ImmutableModel& model) {
+  _drawCount = int(model.GetIndexCount());
+  auto vertex = GenVboDataPTNT(model.GetPosition(),
+                               model.GetTangents(),
+                               model.GetNormals(),
+                               model.GetTexCoords());
+  _vbo = Application::GetInstance().GetContext().CreateVbo(vertex);
+  std::vector<uint32_t> indices(model.GetIndexCount());
+  for (size_t i = 0; i < model.GetIndexCount(); i++) {
+    if (model.GetIndices()[i] >= std::numeric_limits<uint32_t>::max()) {
+      throw AppRuntimeException("model vertex index out of range");
+    }
+    indices[i] = static_cast<decltype(indices)::value_type>(model.GetIndices()[i]);
+  }
+  auto indexData = indices.data();
+  auto indexSize = indices.size() * sizeof(decltype(indices)::value_type);
+  _ibo = Application::GetInstance().GetContext().CreateIndexBuffer(indexData, indexSize);
+}
+
+RenderableWithTangent::RenderableWithTangent(float hasTan) noexcept : Renderable(), _hasTangent(hasTan) {}
+
+RenderableCube::RenderableCube(float halfExtend, bool getTan) noexcept
+    : RenderableWithTangent(getTan), _halfExtend(halfExtend) {}
+
+void RenderableCube::OnCreate() {
+  auto model = ImmutableModel::CreateCube("cube", _halfExtend);
+  if (HasTangent()) {
+    CreateVboWithTangent(model);
+  } else {
+    CreateVbo(model);
+  }
+}
+
+RenderableSphere::RenderableSphere(float radius, int numberSlices, bool getTan) noexcept
+    : RenderableWithTangent(getTan), _radius(radius), _slice(numberSlices) {}
+
+void RenderableSphere::OnCreate() {
+  auto model = ImmutableModel::CreateSphere("sphere", _radius, _slice);
+  if (HasTangent()) {
+    CreateVboIboWithTangent(model);
+  } else {
+    CreateVboIbo(model);
+  }
+}
+
+RenderableQuad::RenderableQuad(float halfExtend, bool getTan) noexcept
+    : RenderableWithTangent(getTan), _halfExtend(halfExtend) {}
+
+void RenderableQuad::OnCreate() {
+  auto model = ImmutableModel::CreateQuad("quad", _halfExtend);
+  if (HasTangent()) {
+    CreateVboWithTangent(model);
+  } else {
+    CreateVbo(model);
+  }
+}
+
+RenderableSimple::RenderableSimple(std::function<ImmutableModel(Renderable&)> onCreate, bool getTan)
+    : RenderableWithTangent(getTan) { _onCreate = std::move(onCreate); }
 
 void RenderableSimple::OnCreate() {
   if (_onCreate) {
     auto model = _onCreate(*this);
     if (model.GetIndexCount() < 16) {
-      CreateVbo(model);
+      if (HasTangent()) {
+        CreateVboWithTangent(model);
+      } else {
+        CreateVbo(model);
+      }
     } else {
-      CreateVboIbo(model);
+      if (HasTangent()) {
+        CreateVboIboWithTangent(model);
+      } else {
+        CreateVboIbo(model);
+      }
     }
   }
   _onCreate = nullptr;

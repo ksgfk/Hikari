@@ -157,11 +157,11 @@ class DepthPass : public RenderPass {
     ActivePipelineConfig();
     ActiveProgram();
     prog->UniformMat4("lightMVP", (_wall->GetTransform().ObjectToWorldMatrix() * lightLookAt * lightPersp).GetAddress());
-    SetVertexBuffer(*(_wall->Vbo), GetVertexLayoutPositionPNT());
+    SetVertexBuffer(*(_wall->Vbo), GetVertexPosPNT());
     SetIndexBuffer(*(_wall->Ibo));
     DrawIndexed(_wall->IndexCount, 0);
     prog->UniformMat4("lightMVP", (_ring->GetTransform().ObjectToWorldMatrix() * lightLookAt * lightPersp).GetAddress());
-    SetVertexBuffer(*(_ring->Vbo), GetVertexLayoutPositionPNT());
+    SetVertexBuffer(*(_ring->Vbo), GetVertexPosPNT());
     SetIndexBuffer(*(_ring->Ibo));
     DrawIndexed(_ring->IndexCount, 0);
     _depthFrame->Unbind();
@@ -214,8 +214,8 @@ class BlinnPhongPass : public RenderPass {
     blinnProg->UniformVec3("_cameraPos", GetCamera()->GetPosition().GetAddress());
     blinnProg->UniformVec3("_specularColor", Vector3f(1, 1, 1).GetAddress());
     blinnProg->UniformFloat("_shininess", 128.0f);
-    SetVertexBuffer(*(_wall->Vbo), GetVertexLayoutPositionPNT());
-    SetVertexBuffer(*(_wall->Vbo), GetVertexLayoutNormalPNT());
+    SetVertexBuffer(*(_wall->Vbo), GetVertexPosPNT());
+    SetVertexBuffer(*(_wall->Vbo), GetVertexNormalPNT());
     SetIndexBuffer(*(_wall->Ibo));
     DrawIndexed(_wall->IndexCount, 0);
 
@@ -227,8 +227,8 @@ class BlinnPhongPass : public RenderPass {
     blinnProg->UniformMat4("lightMVP", (ringModel * lightLookAt * lightPersp).GetAddress());
     blinnProg->UniformVec3("_diffuseColor", Vector3f(1, 0, 0).GetAddress());
     blinnProg->UniformVec3("_ambientColor", Vector3f(0.2f, 0, 0).GetAddress());
-    SetVertexBuffer(*(_ring->Vbo), GetVertexLayoutPositionPNT());
-    SetVertexBuffer(*(_ring->Vbo), GetVertexLayoutNormalPNT());
+    SetVertexBuffer(*(_ring->Vbo), GetVertexPosPNT());
+    SetVertexBuffer(*(_ring->Vbo), GetVertexNormalPNT());
     SetIndexBuffer(*(_ring->Ibo));
     DrawIndexed(_ring->IndexCount, 0);
   }
