@@ -7,6 +7,9 @@
 
 #include <hikari/opengl.h>
 
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_opengl3.h>
+
 namespace Hikari {
 
 static void __MessageCallbackOGL(GLenum source,
@@ -103,7 +106,11 @@ GameObject::~GameObject() noexcept = default;
 
 void GameObject::OnStart() {}
 
+void GameObject::OnPostStart() {}
+
 void GameObject::OnUpdate() {}
+
+void GameObject::OnGui() {}
 
 const std::string& GameObject::GetName() const { return _name; }
 
@@ -562,6 +569,17 @@ void Application::Awake() {
   std::cout << "opengl context loaded" << std::endl;
   std::cout << "renderer:" << feature.GetHardwareInfo() << std::endl;
   std::cout << "driver:" << feature.GetDriverInfo() << std::endl;
+
+  if (_canUseImgui) {  //初始化imgui
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  //开启键盘
+    ImGui::StyleColorsClassic();
+    ImGui_ImplGlfw_InitForOpenGL(glfwWindow, true);
+    ImGui_ImplOpenGL3_Init("#version 330 core");
+  }
+
   if (_shaderLibRoot.empty()) {
     _shaderLibRoot = _assetRoot / "shaders";
   }
@@ -578,6 +596,9 @@ void Application::Awake() {
   for (auto& renderPass : _renderPasses) {
     renderPass->OnStart();
   }
+  for (auto& gameObject : _gameObjects) {
+    gameObject->OnPostStart();
+  }
   for (auto& renderPass : _renderPasses) {
     renderPass->OnPostStart();
   }
@@ -589,7 +610,12 @@ void Application::Awake() {
 void Application::Run() {
   const auto& feature = FeatureOpenGL::Get();
   while (!_window.ShouldClose()) {
-    _input.Update(_window.GetHandle());      //更新input输入
+    //没有任何Window,Item被选中才更新键盘输入
+    if (!_canUseImgui || (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) &&
+                          !ImGui::IsAnyItemHovered() &&
+                          !ImGui::IsAnyItemActive())) {
+      _input.Update(_window.GetHandle());  //更新input输入
+    }
     for (auto& gameObject : _gameObjects) {  //更新GameObject
       gameObject->OnUpdate();
     }
@@ -608,8 +634,25 @@ void Application::Run() {
         renderPass->OnUpdate();
       }
     }
+
+    if (_canUseImgui) {
+      ImGui_ImplOpenGL3_NewFrame();
+      ImGui_ImplGlfw_NewFrame();
+      ImGui::NewFrame();
+      for (auto& go : _gameObjects) {
+        go->OnGui();
+      }
+      ImGui::Render();
+      int display_w, display_h;
+      _window.GetFrameBufferSize(display_w, display_h);
+      HIKARI_CHECK_GL(glViewport(0, 0, display_w, display_h));
+      //HIKARI_CHECK_GL(glClear(GL_COLOR_BUFFER_BIT));
+      ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    }
+
     _window.PollEvents();
     _window.SwapBuffers();
+
     UpdateTime();
     std::this_thread::yield();
   }
@@ -623,6 +666,11 @@ void Application::Destroy() {
   _lights.Clear();
   _gameObjects.clear();
   _renderPasses.clear();
+  if (_canUseImgui) {
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+  }
   _context.Destroy();
   _window.Destroy();  //不知道为啥ubuntu在析构函数里销毁窗口就报错...make ubuntu happy :(
 }
@@ -667,6 +715,14 @@ std::shared_ptr<GameObject> Application::GetGameObject(const std::string& name) 
   auto iter = _gameObjectNameDict.find(name);
   if (iter == _gameObjectNameDict.end()) {
     throw AppRuntimeException(std::string("can't find GameObject ") + name);
+  }
+  return iter->second;
+}
+
+std::shared_ptr<IRenderPass> Application::GetRenderPass(const std::string& name) {
+  auto iter = _renderPassNameDict.find(name);
+  if (iter == _renderPassNameDict.end()) {
+    throw AppRuntimeException(std::string("can't find IRenderPass ") + name);
   }
   return iter->second;
 }
@@ -719,6 +775,10 @@ void Application::AddRenderable(const std::string& name, const std::shared_ptr<R
   } else {
     throw AppRuntimeException("render pass name must be unique");
   }
+}
+
+void Application::EnableImgui() {
+  _canUseImgui = true;
 }
 
 const std::filesystem::path& Application::GetAssetPath() const { return _assetRoot; }

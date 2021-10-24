@@ -7,16 +7,12 @@ C++17标准
 ## Dependent 依赖
 
 * [glfw](https://github.com/glfw/glfw) 实在搞不定Native窗口，以及怎么创建OpenGL上下文...（照着抄都抄歪来
-
 * [glad](https://github.com/Dav1dde/glad) OpenGL函数加载，自己写一遍太麻烦了（
-
 * [stb_image](https://github.com/nothings/stb) 不了解图片格式，还是借助其他库吧
-
 * [tinyobjloader](https://github.com/tinyobjloader/tinyobjloader) 写一个完备的.obj加载有亿点麻烦（
-
 * [glslang](https://github.com/KhronosGroup/glslang) 用来预处理include指令，验证glsl语法
-
 * [SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross) 将glslang生成的spir-v字节码编译回glsl（暂时用不到
+* [imgui](https://github.com/ocornut/imgui) 一个立即模式gui库，听说很好用
 
 ## Structure 结构
 
@@ -44,11 +40,17 @@ Linux Ubuntu下，Clang10编译运行通过，GCC没试（懒
 
 `src/application.cpp`文件里，`ParseArgs`函数里列出了所有支持的命令行参数
 
-**注意：**有些资源的作者不允许再次分发，所以没有传到git上。这些资源需要自行下载并放入对应文件夹
+**注意：** 有些资源的作者不允许再次分发，所以没有传到git上。这些资源需要自行下载并放入对应文件夹
 
 * `scene\assets\copper-rock1-bl`：[copper-rock1-bl.zip](https://freepbr.com/wp-content/uploads/bl/copper-rock1-bl.zip)
 
 ## Show 结果展示
+### 14.Integrate Imgui
+
+<img src="show/14-int_imgui.png" alt="14-int_imgui.png" width="50%">
+
+简单集成了一下IMGUI，可以不用硬编码了！
+
 ### 13.Normal Map
 
 <img src="show/13-normal_map.png" alt="13-normal_map.png" width="50%">

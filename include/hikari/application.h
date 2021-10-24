@@ -16,6 +16,8 @@
 #include <hikari/camera.h>
 #include <hikari/input.h>
 
+#include <imgui.h>
+
 namespace Hikari {
 
 class Application;
@@ -42,7 +44,9 @@ class GameObject {
   virtual ~GameObject() noexcept;
 
   virtual void OnStart();
+  virtual void OnPostStart();
   virtual void OnUpdate();
+  virtual void OnGui();
 
   const std::string& GetName() const;
   void SetName(const std::string& name);
@@ -285,6 +289,7 @@ class Application {
   const std::filesystem::path& GetAssetPath() const;
   const std::filesystem::path& GetShaderLibPath() const;
   std::shared_ptr<GameObject> GetGameObject(const std::string& name);
+  std::shared_ptr<IRenderPass> GetRenderPass(const std::string& name);
   std::any& GetSharedObject(const std::string& name);
   bool HasSharedObject(const std::string& name);
   std::shared_ptr<Renderable> GetRenderable(const std::string& name);
@@ -301,6 +306,7 @@ class Application {
   void SetShaderLibPath(const std::filesystem::path&);
   void ParseArgs(int argc, char** argv);
   void AddRenderable(const std::string& name, const std::shared_ptr<Renderable>& renderable);
+  void EnableImgui();
 
   template <class PassType, class... Args>
   void CreatePass(Args&&... args) {
@@ -331,6 +337,11 @@ class Application {
   std::shared_ptr<ObjectType> GetGameObject(const std::string& name) {
     static_assert(std::is_base_of<GameObject, ObjectType>::value, "ObjectType must be a subclass of GameObject");
     return std::dynamic_pointer_cast<ObjectType, GameObject>(GetGameObject(name));
+  }
+  template <class PassType>
+  std::shared_ptr<PassType> GetRenderPass(const std::string& name) {
+    static_assert(std::is_base_of<IRenderPass, PassType>::value, "PassType must be a subclass of IRenderPass");
+    return std::dynamic_pointer_cast<PassType, IRenderPass>(GetRenderPass(name));
   }
   template <class Type>
   Type GetSharedObject(const std::string& name) {
@@ -365,6 +376,7 @@ class Application {
   int64_t _frameCount{};
   int64_t _frameTimer{};
   float _fps{};
+  bool _canUseImgui{};
 };
 
 }  // namespace Hikari
