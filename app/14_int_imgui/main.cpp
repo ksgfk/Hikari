@@ -87,7 +87,7 @@ class Gui : public GameObject {
 
 int main(int argc, char** argv) {
   auto& app = Application::GetInstance();
-  app.SetWindowCreateInfo({"Hikari Normal Map"});
+  app.SetWindowCreateInfo({"Hikari Integrate Imgui"});
   app.SetRenderContextCreateInfo({3, 3});
   app.ParseArgs(argc, argv);
   app.CreatePass<ColorPass>();

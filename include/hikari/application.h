@@ -98,7 +98,7 @@ class Light : public GameObject {
   Vector3f Direction{0, -1, 0};
 };
 
-class LightCollection {  //TODO:编译shader时把MAX_LIGHT_COUNT宏传进去
+class LightCollection {
  public:
   struct alignas(16) Vec3Align16 {
     Vector3f Data;
@@ -111,9 +111,10 @@ class LightCollection {  //TODO:编译shader时把MAX_LIGHT_COUNT宏传进去
   void CollectData();
   void SubmitData(RenderContextOpenGL& ctx) const;
   void Clear();
+  std::vector<std::string> GetMacro() const;
 
  private:
-  int _maxLight = 8;
+  int _maxLight = 4096;
   std::vector<std::shared_ptr<Light>> _dir;
   std::vector<std::shared_ptr<Light>> _point;
   std::vector<Vec3Align16> _dirRadianceData;
@@ -185,13 +186,14 @@ class RenderableSphere : public RenderableWithTangent {
 
 class RenderableQuad : public RenderableWithTangent {
  public:
-  RenderableQuad(float halfExtend, bool getTan = false) noexcept;
+  RenderableQuad(float halfExtend, bool getTan = false, float offset = 0) noexcept;
   ~RenderableQuad() override = default;
 
   void OnCreate() override;
 
  private:
   float _halfExtend;
+  bool _offset;
 };
 
 class RenderableSimple : public RenderableWithTangent {
@@ -240,7 +242,8 @@ class RenderPass : public IRenderPass {
   std::unique_ptr<Camera>& GetCamera();
   void SetProgram(const std::shared_ptr<ProgramOpenGL>& prog);
   void SetProgram(const std::string& vs, const std::string& fs, const ShaderAttributeLayouts& layouts);
-  void LoadProgram(const std::filesystem::path& vsPath, const std::filesystem::path& fsPath,
+  void LoadProgram(const std::filesystem::path& vsPath,
+                   const std::filesystem::path& fsPath,
                    const ShaderAttributeLayouts& layouts);
   PipelineState& GetPipelineState();
   void SetPipelineState(const PipelineState& state);
@@ -296,6 +299,8 @@ class Application {
   float GetDeltaTime();
   float GetTime();
   float GetFps();
+  int64_t GetRealTime();
+  LightCollection& GetLights() { return _lights; }
 
   void AddPass(const std::shared_ptr<IRenderPass>& pass);
   void SetSharedObject(const std::string& name, std::any&& obj);

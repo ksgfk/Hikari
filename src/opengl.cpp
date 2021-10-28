@@ -904,8 +904,8 @@ std::vector<ShaderUniform> ProgramOpenGL::ReflectActiveUniform(GLuint prog) {
     desc.Length = size;
     desc.Name = std::string(uniName.get());
     desc.Type = MapType(type);
-    if (desc.Length > 1) {  //这个uniform是数组，要把末尾的[0]去掉
-      auto pos = desc.Name.find("[0]");
+    auto pos = desc.Name.find("[0]");
+    if (pos < desc.Name.size()) {  //这个uniform是数组，要把末尾的[0]去掉
       desc.Name.replace(pos, 3, "");
     }
     if (desc.Type == ParamType::Unknown) {
@@ -956,8 +956,8 @@ std::vector<ShaderUniformBlock> ProgramOpenGL::ReflectActiveBlock(GLuint prog) {
       members[j].Type = MapType(types[j]);
       members[j].Length = sizes[j];
       members[j].Offset = offsets[j];
-      if (members[j].Length > 1) {  //这个uniform是数组，要把末尾的[0]去掉
-        auto pos = members[j].Name.find("[0]");
+      auto pos = members[j].Name.find("[0]");
+      if (pos < members[j].Name.size()) {  //这个uniform是数组，要把末尾的[0]去掉.不要用Length去判断是不是数组！
         members[j].Name.replace(pos, 3, "");
       }
     }
@@ -1599,6 +1599,16 @@ FrameBufferOpenGL::FrameBufferOpenGL(const FrameBufferRenderDescriptor& desc) {
     status = HIKARI_CHECK_GL(glCheckFramebufferStatus(GL_FRAMEBUFFER));
     HIKARI_CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
   }
+  if (status != GL_FRAMEBUFFER_COMPLETE) {
+    throw OpenGLException(std::string("can't create depth framebuffer code:") + std::to_string(status));
+  }
+}
+
+FrameBufferOpenGL::FrameBufferOpenGL(GLuint handle) {
+  _handle = handle;
+  HIKARI_CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, _handle));
+  auto status = HIKARI_CHECK_GL(glCheckFramebufferStatus(GL_FRAMEBUFFER));
+  HIKARI_CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, 0));
   if (status != GL_FRAMEBUFFER_COMPLETE) {
     throw OpenGLException(std::string("can't create depth framebuffer code:") + std::to_string(status));
   }

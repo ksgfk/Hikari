@@ -83,6 +83,23 @@ class ShaderIncluder : public glslang::TShader::Includer {
   std::filesystem::path _workPath;
 };
 
+struct GBufferLayout {
+  std::string Stage;
+  PixelFormat Format;
+  ImageDataFormat DataFormat;
+  ImageDataType DataType;
+};
+
+class GBuffer {
+ public:
+  int Width{};
+  int Height{};
+  std::vector<GBufferLayout> Layouts;
+  std::vector<std::shared_ptr<TextureOpenGL>> Buffers;
+  std::shared_ptr<RenderBufferOpenGL> Depth;
+  std::shared_ptr<FrameBufferOpenGL> Frame;
+};
+
 class RenderContextOpenGL {
  public:
   RenderContextOpenGL() noexcept;
@@ -107,19 +124,23 @@ class RenderContextOpenGL {
   std::shared_ptr<BufferOpenGL> CreateUniformBuffer(const void* data, size_t size,
                                                     BufferUsage usage = BufferUsage::Static,
                                                     BufferAccess access = BufferAccess::NoMap);
-  std::shared_ptr<ProgramOpenGL> CreateShaderProgram(const std::string& vs, const std::string& fs,
+  std::shared_ptr<ProgramOpenGL> CreateShaderProgram(const std::string& vs,
+                                                     const std::string& fs,
                                                      const ShaderAttributeLayouts& desc);
   std::shared_ptr<ProgramOpenGL> LoadShaderProgram(const std::filesystem::path& vsPath,
                                                    const std::filesystem::path& fsPath,
                                                    const std::filesystem::path& libPath,
-                                                   const ShaderAttributeLayouts& desc);
+                                                   const ShaderAttributeLayouts& desc,
+                                                   const std::vector<std::string>& macros = {});
   std::shared_ptr<TextureOpenGL> CreateTexture2D(const Texture2dDescriptorOpenGL& desc);
   std::shared_ptr<TextureOpenGL> LoadBitmap2D(std::filesystem::path, WrapMode, FilterMode, PixelFormat);
   std::shared_ptr<TextureOpenGL> CreateCubeMap(const TextureCubeMapDescriptorOpenGL& desc);
   std::shared_ptr<TextureOpenGL> CreateDepthTexture(const DepthTextureDescriptorOpenGL& desc);
   std::shared_ptr<FrameBufferOpenGL> CreateFrameBuffer(const FrameBufferDepthDescriptor& desc);
   std::shared_ptr<FrameBufferOpenGL> CreateFrameBuffer(const FrameBufferRenderDescriptor& desc);
+  std::shared_ptr<FrameBufferOpenGL> CreateFrameBuffer(GLuint handle);
   std::shared_ptr<RenderBufferOpenGL> CreateRenderBuffer(const RenderBufferDescriptor& desc);
+  std::unique_ptr<GBuffer> CreateGBuffer(Vector2i size, const std::vector<GBufferLayout>& layouts, bool hasDepth);
   std::shared_ptr<BufferOpenGL> CreateCubeVbo(float halfExtend, int& vertexCnt);
   std::shared_ptr<BufferOpenGL> CreateQuadVbo(float halfExtend, int& vertexCnt);
   std::shared_ptr<BufferOpenGL> CreateVbo(const std::vector<VertexPNT>& pnt);
@@ -168,9 +189,14 @@ class RenderContextOpenGL {
    * @param type 阶段（shader stage）
    * @param source glsl源码
    * @param res 预处理后glsl源码，如果处理失败则不返回任何数据
+   * @param args 宏
    * @return 是否预处理成功
   */
-  bool PreprocessShader(ShaderType type, const std::string& source, std::string& res);
+  bool PreprocessShader(
+      ShaderType type,
+      const std::string& source,
+      std::string& res,
+      const std::vector<std::string>& args = {});
   /**
    * @brief 完整编译shader，输入的glsl必须可以编译为SPIR-V
    * @param type 阶段（shader stage）

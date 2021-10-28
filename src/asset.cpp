@@ -529,7 +529,7 @@ ImmutableModel ImmutableModel::CreateCube(const std::string& name, float halfExt
                         std::move(indices));
 }
 
-ImmutableModel ImmutableModel::CreateQuad(const std::string& name, float halfExtend) {
+ImmutableModel ImmutableModel::CreateQuad(const std::string& name, float halfExtend, float offset) {
   constexpr const float quadVertices[] =
       {-1.0f, -1.0f, 0.0f, +1.0f,
        +1.0f, -1.0f, 0.0f, +1.0f,
@@ -560,8 +560,8 @@ ImmutableModel ImmutableModel::CreateQuad(const std::string& name, float halfExt
   std::vector<Vector2f> texCoords(numberVertices, Vector2f{});
   std::vector<Vector4f> tangents(numberVertices, Vector4f{});
   for (uint32_t i = 0; i < numberVertices; i++) {
-    vertices[i] = {quadVertices[i * 4 + 0] * halfExtend,
-                   quadVertices[i * 4 + 1] * halfExtend,
+    vertices[i] = {quadVertices[i * 4 + 0] * halfExtend + offset,
+                   quadVertices[i * 4 + 1] * halfExtend + offset,
                    quadVertices[i * 4 + 2]};
     normals[i] = {quadNormal[i * 3 + 0],
                   quadNormal[i * 3 + 1],

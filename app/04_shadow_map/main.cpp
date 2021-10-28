@@ -142,7 +142,7 @@ class DepthPass : public RenderPass {
     desc.TextureFormat = PixelFormat::Depth32;
     desc.DataType = ImageDataType::Float32;
     _depthTex = GetContext().CreateDepthTexture(desc);
-    _depthFrame = GetContext().CreateFrameBuffer({_depthTex->GetHandle()});
+    _depthFrame = GetContext().CreateFrameBuffer(FrameBufferDepthDescriptor{_depthTex->GetHandle()});
     GetApp().SetSharedObject("depth_texture", _depthTex);
     SetPipelineState({});
     SetProgram(shadowVert, shadowFrag, {{"aPos", SemanticType::Vertex, 0}});

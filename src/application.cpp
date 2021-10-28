@@ -243,7 +243,7 @@ void LightCollection::CollectData() {
   }
   for (size_t i = 0; i < _point.size(); i++) {
     _pointRadianceData[i] = {_point[i]->Color * Vector3f(_point[i]->Intensity)};
-    _pointDirectionData[i] = {Normalize(_point[i]->Direction)};
+    _pointDirectionData[i] = {_point[i]->Direction};
   }
 }
 
@@ -263,6 +263,11 @@ void LightCollection::Clear() {
   _dirDirectionData.clear();
   _pointRadianceData.clear();
   _pointDirectionData.clear();
+}
+
+std::vector<std::string> LightCollection::GetMacro() const {
+  return {std::string("#define MAX_DIR_LIGHT ") + std::to_string(_dir.size() == 0 ? 1 : _dir.size()),
+          std::string("#define MAX_POI_LIGHT ") + std::to_string(_point.size() == 0 ? 1 : _point.size())};
 }
 
 Renderable::Renderable() noexcept = default;
@@ -344,11 +349,11 @@ void RenderableSphere::OnCreate() {
   }
 }
 
-RenderableQuad::RenderableQuad(float halfExtend, bool getTan) noexcept
-    : RenderableWithTangent(getTan), _halfExtend(halfExtend) {}
+RenderableQuad::RenderableQuad(float halfExtend, bool getTan, float offset) noexcept
+    : RenderableWithTangent(getTan), _halfExtend(halfExtend), _offset(offset) {}
 
 void RenderableQuad::OnCreate() {
-  auto model = ImmutableModel::CreateQuad("quad", _halfExtend);
+  auto model = ImmutableModel::CreateQuad("quad", _halfExtend, _offset);
   if (HasTangent()) {
     CreateVboWithTangent(model);
   } else {
@@ -432,7 +437,8 @@ void RenderPass::SetProgram(const std::string& vs, const std::string& fs, const 
 
 void RenderPass::LoadProgram(const std::filesystem::path& vsPath, const std::filesystem::path& fsPath,
                              const ShaderAttributeLayouts& layouts) {
-  _prog = GetContext().LoadShaderProgram(vsPath, fsPath, GetApp().GetShaderLibPath(), layouts);
+  auto macros = GetApp().GetLights().GetMacro();
+  _prog = GetContext().LoadShaderProgram(vsPath, fsPath, GetApp().GetShaderLibPath(), layouts, macros);
 }
 
 PipelineState& RenderPass::GetPipelineState() { return _pipeState; }
@@ -803,11 +809,18 @@ void Application::SetSharedObject(const std::string& name, std::any&& obj) {
   _shared[name] = std::move(obj);
 }
 
-float Application::GetDeltaTime() { return _deltaTime / 1000.0f; }
+float Application::GetDeltaTime() {
+  return float(_deltaTime) / 1000.0f;
+}
 
 float Application::GetTime() { return _time / 1000.0f; }
 
 float Application::GetFps() { return _fps; }
+
+int64_t Application::GetRealTime() {
+  auto now = std::chrono::high_resolution_clock::now();
+  return now.time_since_epoch().count();
+}
 
 Application& Application::GetInstance() {
   static Application app;
@@ -826,6 +839,7 @@ void Application::UpdateTime() {
     _frameTimer = 0;
     _frameCount = 0;
   }
+  _time += _deltaTime;
 }
 
 }  // namespace Hikari

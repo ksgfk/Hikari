@@ -270,8 +270,10 @@ std::shared_ptr<BufferOpenGL> RenderContextOpenGL::CreateUniformBuffer(const voi
   return CreateBuffer(data, size, BufferType::UniformBuffer, usage, access);
 }
 
-std::shared_ptr<ProgramOpenGL> RenderContextOpenGL::CreateShaderProgram(const std::string& vs, const std::string& fs,
-                                                                        const ShaderAttributeLayouts& desc) {
+std::shared_ptr<ProgramOpenGL> RenderContextOpenGL::CreateShaderProgram(
+    const std::string& vs,
+    const std::string& fs,
+    const ShaderAttributeLayouts& desc) {
   CheckInit();
   ShaderOpenGL vShader(ShaderType::Vertex, vs);
   if (!vShader.IsValid()) {
@@ -302,7 +304,8 @@ std::shared_ptr<ProgramOpenGL> RenderContextOpenGL::LoadShaderProgram(
     const std::filesystem::path& vsPath,
     const std::filesystem::path& fsPath,
     const std::filesystem::path& libPath,
-    const ShaderAttributeLayouts& desc) {
+    const ShaderAttributeLayouts& desc,
+    const std::vector<std::string>& macros) {
   std::filesystem::path resVsPath;
   if (std::filesystem::exists(vsPath)) {
     resVsPath = vsPath;
@@ -319,12 +322,12 @@ std::shared_ptr<ProgramOpenGL> RenderContextOpenGL::LoadShaderProgram(
   ImmutableText fs("fs", resFsPath);
   auto& ctx = *this;
   std::string resVs;
-  if (!ctx.PreprocessShader(ShaderType::Vertex, vs.GetText(), resVs)) {
+  if (!ctx.PreprocessShader(ShaderType::Vertex, vs.GetText(), resVs, macros)) {
     std::cerr << "preprocess " << vsPath << " error" << std::endl;
     throw RenderContextException("can't preprocess vertex shader");
   }
   std::string resFs;
-  if (!ctx.PreprocessShader(ShaderType::Fragment, fs.GetText(), resFs)) {
+  if (!ctx.PreprocessShader(ShaderType::Fragment, fs.GetText(), resFs, macros)) {
     std::cerr << "preprocess " << fsPath << " error" << std::endl;
     throw RenderContextException("can't preprocess fragment shader");
   }
@@ -386,11 +389,61 @@ std::shared_ptr<FrameBufferOpenGL> RenderContextOpenGL::CreateFrameBuffer(const 
   return fbo;
 }
 
+std::shared_ptr<FrameBufferOpenGL> RenderContextOpenGL::CreateFrameBuffer(GLuint handle) {
+  CheckInit();
+  auto fbo = std::make_shared<FrameBufferOpenGL>(handle);
+  AddObjectToSet(fbo);
+  return fbo;
+}
+
 std::shared_ptr<RenderBufferOpenGL> RenderContextOpenGL::CreateRenderBuffer(const RenderBufferDescriptor& desc) {
   CheckInit();
   auto rbo = std::make_shared<RenderBufferOpenGL>(desc);
   AddObjectToSet(rbo);
   return rbo;
+}
+
+std::unique_ptr<GBuffer> RenderContextOpenGL::CreateGBuffer(
+    Vector2i size,
+    const std::vector<GBufferLayout>& layouts,
+    bool hasDepth) {
+  GLuint gBuffer;
+  HIKARI_CHECK_GL(glGenFramebuffers(1, &gBuffer));
+  HIKARI_CHECK_GL(glBindFramebuffer(GL_FRAMEBUFFER, gBuffer));
+  auto result = std::make_unique<GBuffer>();
+  std::vector<GLuint> attachs;
+  for (size_t i = 0; i < layouts.size(); i++) {
+    const auto& layout = layouts[i];
+    Texture2dDescriptorOpenGL desc;
+    desc.Wrap = WrapMode::Clamp;
+    desc.MinFilter = FilterMode::Bilinear;
+    desc.MagFilter = FilterMode::Bilinear;
+    desc.MipMapLevel = 0;
+    desc.TextureFormat = layout.Format;
+    desc.Width = size.X();
+    desc.Height = size.Y();
+    desc.DataFormat = layout.DataFormat;
+    desc.DataType = layout.DataType;
+    desc.DataPtr = nullptr;
+    auto tex2d = CreateTexture2D(desc);
+    HIKARI_CHECK_GL(glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + GLenum(i), GL_TEXTURE_2D, tex2d->GetHandle(), 0));
+    attachs.emplace_back(GL_COLOR_ATTACHMENT0 + GLenum(i));
+    result->Buffers.emplace_back(tex2d);
+    result->Layouts.emplace_back(layout);
+  }
+  HIKARI_CHECK_GL(glDrawBuffers(GLsizei(attachs.size()), attachs.data()));
+  if (hasDepth) {
+    RenderBufferDescriptor desc;
+    desc.Width = size.X();
+    desc.Height = size.Y();
+    desc.Type = RenderBufferType::Depth;
+    result->Depth = CreateRenderBuffer(desc);
+    HIKARI_CHECK_GL(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, result->Depth->GetHandle()));
+  }
+  result->Width = size.X();
+  result->Height = size.Y();
+  result->Frame = CreateFrameBuffer(gBuffer);
+  return result;
 }
 
 std::shared_ptr<BufferOpenGL> RenderContextOpenGL::CreateCubeVbo(float halfExtend, int& vertexCnt) {
@@ -750,7 +803,11 @@ static void __OutputStrLog(const char* str) {
   }
 }
 
-bool RenderContextOpenGL::PreprocessShader(ShaderType type, const std::string& source, std::string& res) {
+bool RenderContextOpenGL::PreprocessShader(
+    ShaderType type,
+    const std::string& source,
+    std::string& res,
+    const std::vector<std::string>& args) {
   //CheckInit();
   EShLanguage lang = MapShaderTypToGlslang(type);
   glslang::InitializeProcess();
@@ -762,7 +819,13 @@ bool RenderContextOpenGL::PreprocessShader(ShaderType type, const std::string& s
   shader->setAutoMapLocations(true);
   auto src = source.c_str();
   shader->setStrings(&src, 1);
-  shader->setPreamble("\n#extension GL_GOOGLE_include_directive : enable\n");  //启用#include
+  std::vector<std::string> macros(args);
+  macros.emplace_back("#extension GL_GOOGLE_include_directive : enable");  //启用#include
+  std::string preamble;
+  for (const auto& macro : macros) {
+    preamble += (macro + "\n");
+  }
+  shader->setPreamble(preamble.c_str());
   std::string result;
   bool proc = shader->preprocess(&__BuiltInRes, 110, ECoreProfile, false, false, EShMsgDefault, &result, _includer);
   if (proc) {

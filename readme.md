@@ -30,13 +30,13 @@ CMake工程，没有花里胡哨的配置，按一般编译步骤来就行（
 
 Windows下，Visual Studio 2019（MSVC v142）编译运行通过
 
-Linux Ubuntu下，Clang10编译运行通过，GCC没试（懒
+Linux Ubuntu下，Clang10编译运行通过，GCC没试（测试截止到5-Multi Light，再往后的就没在linux测试过，有没有好心大佬帮忙测一下
 
 **注意：** glfw在linux下创建窗口用X11，依赖一些包：`libx11-dev`、`libxrandr-dev`、`libxinerama-dev`、`libxcursor-dev`、`libxi-dev`，需要提前安装好
 
 如果使用在linux使用clang编译还需要安装`libc++-dev`和`libc++abi-dev`
 
-**注意：** 有些app必须输入资源文件的根目录，例如`app.exe -A "<工程根目录>/scene/assets"`。路径有误的话，可能会直接crash（
+**注意：** 有些app（或者说大部分app）必须输入资源文件的根目录，例如`app.exe -A "<工程根目录>/scene/assets"`。路径有误的话，可能会直接crash（
 
 `src/application.cpp`文件里，`ParseArgs`函数里列出了所有支持的命令行参数
 
@@ -45,9 +45,23 @@ Linux Ubuntu下，Clang10编译运行通过，GCC没试（懒
 * `scene\assets\copper-rock1-bl`：[copper-rock1-bl.zip](https://freepbr.com/wp-content/uploads/bl/copper-rock1-bl.zip)
 
 ## Show 结果展示
+### 15.Deferred Shading
+
+<img src="show/15-deferred_shade.png" alt="15-deferred_shade.png" width="50%">
+
+<img src="show/15-deferred_shade_2.png" alt="15-deferred_shade_2.png" width="50%">
+
+**注意：** 需要加载资源
+
+满天繁星
+
+没有任何优化的deffered shading，1024光源1080p跑20帧
+
 ### 14.Integrate Imgui
 
 <img src="show/14-int_imgui.png" alt="14-int_imgui.png" width="50%">
+
+**注意：** 需要加载资源
 
 简单集成了一下IMGUI，可以不用硬编码了！
 
@@ -55,11 +69,15 @@ Linux Ubuntu下，Clang10编译运行通过，GCC没试（懒
 
 <img src="show/13-normal_map.png" alt="13-normal_map.png" width="50%">
 
+**注意：** 需要加载资源
+
 PBR加持的法线纹理。实现的时候是用TBN矩阵把法线从切线空间转换到世界空间计算的。转换到切线空间感觉...挺麻烦...
 
 ### 11.PBR Environment
 
 <img src="show/11-pbr_env.png" alt="11-pbr_env.png" width="50%">
+
+**注意：** 需要加载资源
 
 直接光照+IBL环境光=基于物理的渲染！（还差个相机...）
 

@@ -556,6 +556,7 @@ class FrameBufferOpenGL : public ObjectOpenGL {
   FrameBufferOpenGL() noexcept;
   FrameBufferOpenGL(const FrameBufferDepthDescriptor& depth);
   FrameBufferOpenGL(const FrameBufferRenderDescriptor& desc);
+  FrameBufferOpenGL(GLuint handle);  //放弃治疗，这个东西太灵活了
   FrameBufferOpenGL(FrameBufferOpenGL&&) noexcept;
   FrameBufferOpenGL& operator=(FrameBufferOpenGL&&) noexcept;
   ~FrameBufferOpenGL() noexcept override;
